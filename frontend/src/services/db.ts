@@ -261,12 +261,25 @@ class DatabaseService {
           ),
         }));
 
-        // Merge cloud students with local students
+        // Merge cloud students with local students (pertahankan foto lokal jika photo_path di cloud belum TEXT)
         const localStudents = this.getRawStudents();
         const mergedMap = new Map<string, StudentRecord>();
 
         localStudents.forEach(s => mergedMap.set(s.nis, s));
-        mapped.forEach(s => mergedMap.set(s.nis, s));
+        mapped.forEach(cloudStudent => {
+          const localStudent = mergedMap.get(cloudStudent.nis);
+          if (localStudent && (!cloudStudent.latest_photo || cloudStudent.latest_photo.length < 10) && localStudent.latest_photo) {
+            cloudStudent.latest_photo = localStudent.latest_photo;
+            if (cloudStudent.embeddings && localStudent.embeddings) {
+              cloudStudent.embeddings.forEach((ce, idx) => {
+                if ((!ce.photo_data || ce.photo_data.length < 10) && localStudent.embeddings[idx]?.photo_data) {
+                  ce.photo_data = localStudent.embeddings[idx].photo_data;
+                }
+              });
+            }
+          }
+          mergedMap.set(cloudStudent.nis, cloudStudent);
+        });
 
         const finalMerged = Array.from(mergedMap.values());
         localStorage.setItem(this.studentsKey, JSON.stringify(finalMerged));
@@ -412,7 +425,22 @@ class DatabaseService {
             photo_path: e.photo_data,
           }));
 
-          const { error: embErr } = await supabase.from('face_embeddings').insert(embPayload);
+          let { error: embErr } = await supabase.from('face_embeddings').insert(embPayload);
+
+          // Jika kolom photo_path di Supabase berukuran varchar(255), lakukan retry dengan photo_path: null
+          // agar pendaftaran siswa dan vektor pengenalan wajah AI tetap tersimpan 100% ke Cloud
+          if (embErr && embErr.message?.includes('value too long')) {
+            console.warn(
+              '[Database] ⚠️ Kolom photo_path di Supabase adalah VARCHAR(255). Menyimpan vektor wajah AI tanpa base64 di cloud...'
+            );
+            const fallbackPayload = embPayload.map(e => ({
+              ...e,
+              photo_path: null,
+            }));
+            const retryRes = await supabase.from('face_embeddings').insert(fallbackPayload);
+            embErr = retryRes.error;
+          }
+
           if (embErr) {
             console.error('[Database] ❌ Supabase insert embeddings error:', embErr);
             throw new Error(`Gagal menyimpan foto & vektor wajah ke Supabase Cloud: ${embErr.message}`);
@@ -630,7 +658,7 @@ class DatabaseService {
     // Sinkronisasi Real-Time ke Supabase
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('attendances').insert({
+        const attPayload = {
           id: newRecord.id,
           student_id: newRecord.student_id,
           date: newRecord.date,
@@ -639,7 +667,24 @@ class DatabaseService {
           confidence_score: newRecord.confidence_score,
           verification_method: newRecord.verification_method,
           notes: newRecord.notes,
-        });
+          captured_photo: newRecord.captured_photo,
+        };
+
+        let { error: attErr } = await supabase.from('attendances').insert(attPayload);
+
+        // Fallback jika captured_photo di Supabase adalah varchar(255)
+        if (attErr && attErr.message?.includes('value too long')) {
+          console.warn('[Database] ⚠️ captured_photo di Supabase adalah VARCHAR(255). Menyimpan presensi tanpa snapshot...');
+          const retryAtt = await supabase.from('attendances').insert({
+            ...attPayload,
+            captured_photo: null,
+          });
+          attErr = retryAtt.error;
+        }
+
+        if (attErr) {
+          console.warn('[Database] Supabase attendance push notice:', attErr);
+        }
       } catch (err) {
         console.warn('[Database] Supabase attendance push notice:', err);
       }
