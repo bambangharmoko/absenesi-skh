@@ -83,18 +83,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
             Dashboard Pemantauan Presensi
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Monitoring kehadiran siswa SKH Santo Fransiskus Asisi secara real-time
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => onNavigate('kiosk')}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition"
+            className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition"
           >
             <Camera className="w-4 h-4" />
             <span>Buka Kiosk Absensi</span>
@@ -102,17 +102,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
           <button
             onClick={() => onNavigate('register')}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 border border-slate-700 transition"
+            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 border border-slate-700 transition"
           >
-            <Plus className="w-4 h-4 text-emerald-400" />
+            <Plus className="w-4 h-4 text-slate-400" />
             <span>Daftar Siswa Baru</span>
           </button>
         </div>
       </div>
 
       {/* Class Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5 mr-2">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mr-2">
           <Filter className="w-3.5 h-3.5" />
           Filter:
         </span>
@@ -120,10 +120,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <button
             key={tab.id}
             onClick={() => setSelectedClass(tab.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
               selectedClass === tab.id
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800 hover:bg-slate-800'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800 hover:bg-slate-800'
             }`}
           >
             {tab.label}
@@ -132,66 +132,65 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       </div>
 
       {/* Metric Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {/* Total Students */}
-        <div className="p-4 sm:p-5 rounded-2xl glass-panel border border-slate-800 relative overflow-hidden">
+        <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Siswa</span>
-            <Users className="w-4 h-4 text-slate-400" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Siswa</span>
+            <Users className="w-4 h-4 text-slate-500" />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-white">
+          <div className="text-2xl sm:text-3xl font-bold text-white font-mono tabular-nums">
             {summary ? summary.total_students : 0}
           </div>
           <div className="text-[11px] text-slate-400 mt-1">Terdaftar di sistem</div>
         </div>
 
         {/* Hadir Tepat Waktu */}
-        <div className="p-4 sm:p-5 rounded-2xl glass-panel border border-emerald-500/20 relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Hadir Tepat Waktu</span>
+        <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">Tepat Waktu</span>
             <UserCheck className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-400">
+          <div className="text-2xl sm:text-3xl font-bold text-emerald-400 font-mono tabular-nums">
             {summary ? summary.total_present : 0}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">Tiba sebelum 07:30 WIB</div>
+          <div className="text-[11px] text-slate-400 mt-1">Sebelum 07:30 WIB</div>
         </div>
 
         {/* Terlambat */}
-        <div className="p-4 sm:p-5 rounded-2xl glass-panel border border-amber-500/20 relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">Terlambat</span>
+        <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">Terlambat</span>
             <AlertTriangle className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-400">
+          <div className="text-2xl sm:text-3xl font-bold text-amber-400 font-mono tabular-nums">
             {summary ? summary.total_late : 0}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">Tiba lewat 07:30 WIB</div>
+          <div className="text-[11px] text-slate-400 mt-1">Lewat 07:30 WIB</div>
         </div>
 
-
         {/* Sudah Pulang */}
-        <div className="p-4 sm:p-5 rounded-2xl glass-panel border border-teal-500/20 relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-teal-400">Sudah Pulang</span>
-            <ShieldCheck className="w-4 h-4 text-teal-400" />
+        <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-400">Sudah Pulang</span>
+            <ShieldCheck className="w-4 h-4 text-blue-400" />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-teal-400">
+          <div className="text-2xl sm:text-3xl font-bold text-blue-400 font-mono tabular-nums">
             {summary ? summary.checkout_count : 0}
           </div>
           <div className="text-[11px] text-slate-400 mt-1">Presensi kepulangan</div>
         </div>
 
-        {/* Belum Hadir / Persentase */}
-        <div className="p-4 sm:p-5 rounded-2xl glass-panel border border-slate-800 relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Kehadiran</span>
-            <span className="text-xs font-bold text-emerald-400">{summary?.attendance_rate || 0}%</span>
+        {/* Kehadiran Rate */}
+        <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tingkat Kehadiran</span>
+            <span className="text-xs font-bold text-blue-400 font-mono">{summary?.attendance_rate || 0}%</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-200">
+          <div className="text-2xl sm:text-3xl font-bold text-slate-100 font-mono tabular-nums">
             {summary ? summary.total_absent : 0}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">Belum Hadir Hari Ini</div>
+          <div className="text-[11px] text-slate-400 mt-1">Belum hadir hari ini</div>
         </div>
       </div>
 

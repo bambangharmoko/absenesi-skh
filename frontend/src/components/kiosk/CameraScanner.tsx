@@ -272,7 +272,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         ctx.translate(x + w / 2, Math.max(24, y - 10));
         ctx.scale(-1, 1);
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 16px Outfit, sans-serif';
+        ctx.font = '600 14px "Plus Jakarta Sans", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(name, 0, 0);
         ctx.restore();
@@ -563,7 +563,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const isAlreadyCheckedOut = Boolean(todayRecord && todayRecord.time_out);
 
   return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl">
+    <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden rounded-xl bg-slate-950 border border-slate-800 shadow-sm">
       {/* Video Stream Container */}
       <div className="relative w-full h-full min-h-[460px] md:min-h-[560px] flex items-center justify-center overflow-hidden bg-slate-900">
         {/* Video Element */}
@@ -593,29 +593,29 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {/* Fallback Display when Camera is Offline */}
         {!isStreaming && (
           <div className="flex flex-col items-center justify-center p-8 text-center max-w-md z-20">
-            <div className="w-20 h-20 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 mb-4 animate-pulse">
-              <CameraOff className="w-10 h-10" />
+            <div className="w-16 h-16 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 mb-4">
+              <CameraOff className="w-8 h-8" />
             </div>
-            <h4 className="text-xl font-bold text-slate-200 mb-2">
+            <h4 className="text-base font-semibold text-slate-100 mb-1.5">
               {cameraError ? 'Izin Kamera Diperlukan' : 'Memulai Kamera...'}
             </h4>
-            <p className="text-sm text-slate-400 mb-6">
-              {cameraError || 'Mohon izinkan akses webcam pada browser atau lakukan absensi manual dengan tombol di bawah.'}
+            <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+              {cameraError || 'Mohon izinkan akses webcam pada peramban Anda untuk memulai verifikasi wajah.'}
             </p>
-            <div className="flex flex-wrap gap-3 justify-center">
+            <div className="flex flex-wrap gap-2.5 justify-center">
               <button
                 onClick={startCamera}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition text-sm"
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center gap-2 shadow-sm transition text-xs"
               >
                 <Camera className="w-4 h-4" />
-                Aktifkan Kamera
+                <span>Aktifkan Kamera</span>
               </button>
               <button
                 onClick={handleOpenManualAttendance}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/30 transition text-sm"
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium flex items-center gap-2 transition text-xs"
               >
                 <UserCheck className="w-4 h-4" />
-                Absen Manual (Pilih Siswa)
+                <span>Absen Manual</span>
               </button>
             </div>
           </div>
@@ -627,17 +627,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {/* Top Floating Status & Action Bar */}
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-30 flex-wrap gap-2">
           {/* Status Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-xs sm:text-sm font-semibold shadow-lg">
-            {hudStatus === 'MATCHED' && <UserCheck className="w-4 h-4 text-emerald-400 animate-bounce" />}
-            {hudStatus === 'UNKNOWN' && <ShieldAlert className="w-4 h-4 text-red-400" />}
-            {hudStatus === 'SEARCHING' && <Sparkles className="w-4 h-4 text-yellow-400 animate-spin" />}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-medium shadow-sm backdrop-blur-sm">
+            {hudStatus === 'MATCHED' && <UserCheck className="w-4 h-4 text-emerald-400" />}
+            {hudStatus === 'UNKNOWN' && <ShieldAlert className="w-4 h-4 text-rose-400" />}
+            {hudStatus === 'SEARCHING' && <Sparkles className="w-4 h-4 text-blue-400" />}
             <span
               className={
                 hudStatus === 'MATCHED'
-                  ? 'text-emerald-300'
+                  ? 'text-emerald-300 font-medium'
                   : hudStatus === 'UNKNOWN'
-                    ? 'text-red-300'
-                    : 'text-yellow-300'
+                    ? 'text-rose-300 font-medium'
+                    : 'text-slate-300 font-normal'
               }
             >
               {hudLabel}
@@ -647,11 +647,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           {/* Right Controls: Mode Toggle & Manual Button */}
           <div className="pointer-events-auto flex items-center gap-2">
             {/* Mode Switcher: Auto / Masuk / Pulang */}
-            <div className="flex items-center p-1 rounded-full bg-slate-900/90 border border-slate-700 shadow-md">
+            <div className="flex items-center p-0.5 rounded-lg bg-slate-900/90 border border-slate-800 shadow-sm backdrop-blur-sm">
               <button
                 onClick={() => setKioskMode('AUTO')}
                 title="Mode Otomatis (Masuk Pagi / Pulang Siang)"
-                className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition ${kioskMode === 'AUTO'
+                className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition ${kioskMode === 'AUTO'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                   }`}
@@ -663,7 +663,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
               <button
                 onClick={() => setKioskMode('IN')}
                 title="Mode Khusus Presensi Masuk"
-                className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition ${kioskMode === 'IN'
+                className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition ${kioskMode === 'IN'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                   }`}
@@ -675,7 +675,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
               <button
                 onClick={() => setKioskMode('OUT')}
                 title="Mode Khusus Presensi Pulang"
-                className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition ${kioskMode === 'OUT'
+                className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition ${kioskMode === 'OUT'
                     ? 'bg-amber-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                   }`}
@@ -688,16 +688,16 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             <button
               onClick={() => setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'))}
               title="Ganti Kamera Depan/Belakang"
-              className="p-2.5 rounded-full glass-panel hover:bg-slate-800 text-slate-300 transition"
+              className="p-2 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 transition"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
 
             <button
               onClick={handleOpenManualAttendance}
-              className="px-3.5 py-2 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition transform active:scale-95"
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition"
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-3.5 h-3.5 text-blue-400" />
               <span>Absen Manual</span>
             </button>
           </div>
@@ -708,9 +708,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {/* ========================================================= */}
         {pendingMatch && (
           <div className="absolute inset-x-4 bottom-4 z-40 flex justify-center animate-slideUp">
-            <div className="w-full max-w-lg bg-slate-900/95 border-2 border-emerald-500/80 rounded-3xl p-5 shadow-2xl backdrop-blur-xl flex flex-col gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-800 border-2 border-emerald-400 flex-shrink-0 flex items-center justify-center shadow-lg">
+            <div className="w-full max-w-lg bg-slate-900/95 border border-slate-700 rounded-xl p-4 shadow-xl backdrop-blur-md flex flex-col gap-3.5">
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 flex items-center justify-center">
                   {pendingMatch.student.photo_url ? (
                     <img
                       src={pendingMatch.student.photo_url}
@@ -718,67 +718,67 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-xl font-black text-emerald-400">
+                    <span className="text-lg font-bold text-blue-400">
                       {pendingMatch.student.nickname.charAt(0)}
                     </span>
                   )}
                 </div>
 
                 <div className="flex-1 overflow-hidden">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-bold border border-emerald-500/30">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       {Math.round(pendingMatch.confidence * 100)}% Wajah Cocok
                     </span>
                     {isAlreadyCheckedIn && !isAlreadyCheckedOut && (
-                      <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[11px] font-semibold border border-blue-500/30">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
                         Sudah Masuk ({todayRecord?.time_in})
                       </span>
                     )}
                     {isAlreadyCheckedOut && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[11px] font-semibold border border-amber-500/30">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
                         Sudah Pulang ({todayRecord?.time_out})
                       </span>
                     )}
                   </div>
 
-                  <h3 className="text-lg font-black text-white truncate mt-1">
+                  <h3 className="text-base font-bold text-white truncate mt-1">
                     {pendingMatch.student.name}
                   </h3>
-                  <p className="text-xs font-semibold text-emerald-400">
-                    Panggilan: {pendingMatch.student.nickname} • <span className="text-slate-300">{pendingMatch.student.class_name}</span>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Panggilan: <span className="font-semibold text-slate-200">{pendingMatch.student.nickname}</span> • <span>{pendingMatch.student.class_name}</span>
                   </p>
                 </div>
               </div>
 
               {/* Warning Alert Banner if student tries to check out without checking in */}
               {warningAlertMsg && (
-                <div className="p-3 rounded-2xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-200 text-xs font-bold flex items-center gap-2.5 animate-fadeIn shadow-lg">
+                <div className="p-2.5 rounded-lg bg-amber-950/70 border border-amber-500/50 text-amber-200 text-xs flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0" />
                   <span>{warningAlertMsg}</span>
                 </div>
               )}
 
               {/* Action Buttons: Hadir Masuk vs Hadir Pulang */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-800 flex-wrap">
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
                 <button
                   onClick={handleCancelPendingMatch}
-                  className="px-3.5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 transition"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Refresh</span>
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset</span>
                 </button>
 
                 {/* Tombol Presensi Masuk */}
                 <button
                   onClick={() => handleConfirmAttendance('IN')}
                   disabled={isSubmittingAttendance || isAlreadyCheckedIn}
-                  className={`flex-1 py-3 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-lg transition transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${!isAlreadyCheckedIn
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-emerald-500/30'
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed ${!isAlreadyCheckedIn
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
                       : 'bg-slate-800 text-slate-400'
                     }`}
                 >
-                  <Sun className="w-4 h-4" />
-                  <span>{isAlreadyCheckedIn ? 'Sudah Masuk' : 'KLIK MASUK (HADIR)'}</span>
+                  <Sun className="w-3.5 h-3.5" />
+                  <span>{isAlreadyCheckedIn ? 'Sudah Masuk' : 'Konfirmasi Masuk'}</span>
                 </button>
 
                 {/* Tombol Presensi Pulang */}
@@ -786,33 +786,35 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
                   onClick={() => handleConfirmAttendance('OUT')}
                   disabled={isSubmittingAttendance || isAlreadyCheckedOut}
                   title={!isAlreadyCheckedIn ? 'Siswa belum ada absen masuk hari ini' : 'Klik untuk presensi pulang'}
-                  className={`flex-1 py-3 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-lg transition transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${isAlreadyCheckedIn && !isAlreadyCheckedOut
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-amber-500/30'
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed ${isAlreadyCheckedIn && !isAlreadyCheckedOut
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white'
                       : 'bg-slate-800 text-slate-400'
                     }`}
                 >
-                  <Home className="w-4 h-4" />
-                  <span>{isAlreadyCheckedOut ? 'Sudah Pulang' : 'KLIK PULANG'}</span>
+                  <Home className="w-3.5 h-3.5" />
+                  <span>{isAlreadyCheckedOut ? 'Sudah Pulang' : 'Konfirmasi Pulang'}</span>
                 </button>
               </div>
             </div>
           </div>
         )}
 
-
         {/* Bottom Helper Bar (When No Pending Match) */}
         {!pendingMatch && (
           <div className="absolute bottom-4 left-4 right-4 pointer-events-none z-30 flex items-center justify-between">
-            <div className="hidden sm:inline-block px-4 py-2 rounded-2xl glass-panel text-xs text-slate-300 shadow-xl border border-slate-700/50">
-              💡 Mode: <span className="font-bold text-emerald-400">{kioskMode === 'AUTO' ? 'Otomatis' : kioskMode === 'IN' ? 'Presensi Masuk' : 'Presensi Pulang'}</span> • Tatap kamera lalu klik Masuk/Pulang
+            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs text-slate-300 shadow-sm backdrop-blur-sm">
+              <span className="text-slate-400">Mode:</span>
+              <span className="font-semibold text-blue-400">{kioskMode === 'AUTO' ? 'Otomatis' : kioskMode === 'IN' ? 'Presensi Masuk' : 'Presensi Pulang'}</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-slate-400">Posisikan wajah di depan kamera</span>
             </div>
 
             <button
               onClick={handleOpenManualAttendance}
-              className="pointer-events-auto px-4 py-2 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 shadow-lg backdrop-blur-md transition ml-auto"
+              className="pointer-events-auto px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 flex items-center gap-1.5 shadow-sm backdrop-blur-sm transition ml-auto"
             >
               <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Wajah Tidak Terdeteksi? Klik Absen Manual</span>
+              <span>Absen Manual</span>
             </button>
           </div>
         )}
@@ -822,131 +824,131 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       {/* MODAL: ABSENSI MANUAL & VERIFIKASI FOTO */}
       {/* ========================================== */}
       {showManualModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-900/60">
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/80">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <Camera className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <Camera className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Absensi Manual (Masuk & Pulang)</h3>
-                  <p className="text-xs text-slate-400">Foto snapshot diambil dari kamera saat tombol ditekan</p>
+                  <h3 className="text-sm font-bold text-white">Presensi Manual Siswa</h3>
+                  <p className="text-xs text-slate-400">Pilih siswa dan konfirmasi waktu kehadiran</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowManualModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 overflow-y-auto space-y-5 flex-1">
+            <div className="p-4 overflow-y-auto space-y-4 flex-1">
               {/* Mode Selection */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setManualModeChoice('IN')}
-                  className={`flex-1 p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${manualModeChoice === 'IN'
-                      ? 'bg-emerald-950/70 border-emerald-500 text-emerald-300'
-                      : 'bg-slate-950/50 border-slate-800 text-slate-400'
+                  className={`flex-1 p-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition ${manualModeChoice === 'IN'
+                      ? 'bg-blue-600/15 border-blue-500 text-blue-300'
+                      : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                 >
-                  <Sun className="w-4 h-4 text-emerald-400" />
-                  <span>Presensi Masuk (Pagi)</span>
+                  <Sun className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Presensi Masuk</span>
                 </button>
 
                 <button
                   onClick={() => setManualModeChoice('OUT')}
-                  className={`flex-1 p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${manualModeChoice === 'OUT'
-                      ? 'bg-amber-950/70 border-amber-500 text-amber-300'
-                      : 'bg-slate-950/50 border-slate-800 text-slate-400'
+                  className={`flex-1 p-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition ${manualModeChoice === 'OUT'
+                      ? 'bg-amber-600/15 border-amber-500 text-amber-300'
+                      : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                 >
-                  <Home className="w-4 h-4 text-amber-400" />
-                  <span>Presensi Pulang (Siang)</span>
+                  <Home className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Presensi Pulang</span>
                 </button>
               </div>
 
               {/* Snapshot Preview & AI Status */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 flex items-center justify-center">
+              <div className="flex flex-col sm:flex-row items-center gap-3.5 p-3 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="w-20 h-20 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 flex-shrink-0 flex items-center justify-center">
                   {capturedSnapshot ? (
                     <img src={capturedSnapshot} alt="Snapshot" className="w-full h-full object-cover transform scale-x-[-1]" />
                   ) : (
-                    <CameraOff className="w-8 h-8 text-slate-500" />
+                    <CameraOff className="w-6 h-6 text-slate-500" />
                   )}
                 </div>
 
-                <div className="flex-1 space-y-1.5 text-center sm:text-left">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Hasil Pemindaian Snapshot:
+                <div className="flex-1 space-y-1 text-center sm:text-left">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Snapshot Terakhir
                   </div>
-                  <div className="text-sm font-semibold text-slate-200">
-                    {manualAiMessage || 'Foto snapshot tersimpan. Pilih siswa untuk mencatat kehadiran.'}
+                  <div className="text-xs text-slate-300">
+                    {manualAiMessage || 'Foto snapshot tersimpan. Silakan pilih siswa dari daftar di bawah.'}
                   </div>
                   {selectedManualStudent && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold mt-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mt-1">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Siswa Dipilih: {selectedManualStudent.full_name} ({selectedManualStudent.nickname})</span>
+                      <span>Siswa: {selectedManualStudent.full_name} ({selectedManualStudent.nickname})</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Search & Student List */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Pilih Nama Siswa ({filteredStudents.length} siswa):
+                  <label className="text-xs font-semibold text-slate-300">
+                    Daftar Siswa ({filteredStudents.length}):
                   </label>
-                  <span className="text-xs text-slate-500">Klik siswa yang sesuai</span>
+                  <span className="text-[11px] text-slate-500">Klik baris siswa untuk memilih</span>
                 </div>
 
                 <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={manualSearch}
                     onChange={e => setManualSearch(e.target.value)}
                     placeholder="Cari nama siswa atau NIS..."
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-emerald-500 placeholder-slate-500"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 placeholder-slate-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                   {filteredStudents.map(student => {
                     const isSelected = selectedManualStudent?.id === student.id;
                     return (
                       <div
                         key={student.id}
                         onClick={() => setSelectedManualStudent(student)}
-                        className={`flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition ${isSelected
-                            ? 'bg-emerald-950/50 border-emerald-500 shadow-md shadow-emerald-950'
+                        className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition ${isSelected
+                            ? 'bg-blue-600/10 border-blue-500 shadow-sm'
                             : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
                           }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-md overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0">
                             {student.latest_photo ? (
                               <img src={student.latest_photo} alt={student.nickname} className="w-full h-full object-cover" />
                             ) : (
-                              <User className="w-5 h-5 text-slate-400" />
+                              <User className="w-4 h-4 text-slate-400" />
                             )}
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-white">{student.full_name}</div>
-                            <div className="text-[11px] text-emerald-400 font-medium">
-                              {student.nickname} • <span className="text-slate-400">{student.class_name}</span>
+                            <div className="text-xs font-semibold text-white">{student.full_name}</div>
+                            <div className="text-[11px] text-slate-400">
+                              {student.nickname} • <span className="text-slate-500">{student.class_name}</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-700 text-transparent'
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-transparent'
                           }`}>
-                          <Check className="w-3.5 h-3.5" />
+                          <Check className="w-3 h-3" />
                         </div>
                       </div>
                     );
@@ -956,10 +958,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-5 border-t border-slate-800 bg-slate-900/60 flex items-center justify-between gap-3">
+            <div className="p-4 border-t border-slate-800 bg-slate-900/80 flex items-center justify-between gap-3">
               <button
                 onClick={() => setShowManualModal(false)}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+                className="px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
               >
                 Batal
               </button>
@@ -967,17 +969,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
               <button
                 onClick={handleConfirmManualAttendance}
                 disabled={!selectedManualStudent || isVerifyingManual}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-2 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>
                   {isVerifyingManual
-                    ? 'Memproses Presensi...'
+                    ? 'Memproses...'
                     : selectedManualStudent
-                      ? `Konfirmasi ${manualModeChoice === 'IN' ? 'Masuk' : 'Pulang'} (${selectedManualStudent.nickname})`
-                      : 'Pilih Siswa Terlebih Dahulu'}
+                      ? `Catat ${manualModeChoice === 'IN' ? 'Masuk' : 'Pulang'} (${selectedManualStudent.nickname})`
+                      : 'Pilih Siswa'}
                 </span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

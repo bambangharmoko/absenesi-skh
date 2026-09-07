@@ -42,26 +42,26 @@ export const ReportsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
             Laporan & Rekapitulasi Presensi
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Unduh berkas Excel resmi rekap presensi bulanan SKH Santo Fransiskus Asisi
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={handlePrint}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 border border-slate-700 transition"
+            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 border border-slate-700 transition"
           >
             <Printer className="w-4 h-4" />
-            <span>Cetak / Cetak PDF</span>
+            <span>Cetak PDF</span>
           </button>
 
           <button
             onClick={handleDownloadExcel}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition"
+            className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition"
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>Export Excel (.xlsx)</span>
@@ -70,16 +70,16 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* Filter Parameters */}
-      <div className="rounded-3xl glass-panel p-6 border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="rounded-lg bg-slate-900/60 p-4 border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <div>
-          <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+          <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
             Bulan:
           </label>
           <select
             value={selectedMonth}
             onChange={e => setSelectedMonth(Number(e.target.value))}
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
           >
             {months.map(m => (
               <option key={m.value} value={m.value}>
@@ -90,14 +90,14 @@ export const ReportsPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+          <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
             Tahun:
           </label>
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(Number(e.target.value))}
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
           >
             {[2024, 2025, 2026, 2027].map(y => (
               <option key={y} value={y}>
@@ -108,14 +108,14 @@ export const ReportsPage: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-emerald-400" />
+          <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-blue-400" />
             Kelas Siswa:
           </label>
           <select
             value={selectedClass}
             onChange={e => setSelectedClass(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
           >
             <option value="all">Semua Kelas</option>
             <option value="Kelas 1 Autis">Kelas 1 Autis</option>
@@ -126,59 +126,59 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* Export Preview Card */}
-      <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-6 sm:p-8 border border-slate-800 shadow-xl space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <FileSpreadsheet className="w-6 h-6" />
+      <div className="rounded-lg bg-slate-900/60 p-5 border border-slate-800 space-y-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-sm font-bold text-white">
                 Format Rekapitulasi Presensi SKH (.xlsx)
               </h3>
               <p className="text-xs text-slate-400">
-                Laporan mencakup matriks kehadiran harian (H, T, I, S, A) dan persentase kehadiran per siswa
+                Matriks kehadiran harian (H, T, I, S, A) dan persentase kehadiran per siswa
               </p>
             </div>
           </div>
 
           <button
             onClick={handleDownloadExcel}
-            className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition"
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-2 shadow-sm transition"
           >
             <Download className="w-4 h-4" />
-            <span>Download Excel Sekarang</span>
+            <span>Unduh Berkas Excel</span>
           </button>
         </div>
 
         {/* Features Checklist */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
             <div>
-              <div className="font-bold text-slate-200">Matriks Hari 1 - 31</div>
+              <div className="font-semibold text-slate-200">Matriks Hari 1 - 31</div>
               <div className="text-slate-400 text-[11px] mt-0.5">
-                Pewarnaan otomatis (Hijau Hadir, Kuning Terlambat, Biru Izin, Merah Sakit)
+                Pewarnaan status hadir, terlambat, izin, sakit, dan alpha
               </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-3">
+          <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
             <div>
-              <div className="font-bold text-slate-200">Format Resmi SKH</div>
+              <div className="font-semibold text-slate-200">Format Resmi Sekolah</div>
               <div className="text-slate-400 text-[11px] mt-0.5">
-                Kop laporan sekolah, nama siswa, NIS, dan kategori kebutuhan khusus
+                Dilengkapi kop surat, nama siswa, NIS, dan kategori kekhususan
               </div>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-3">
+          <div className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
             <div>
-              <div className="font-bold text-slate-200">Perhitungan Otomatis</div>
+              <div className="font-semibold text-slate-200">Kalkulasi Otomatis</div>
               <div className="text-slate-400 text-[11px] mt-0.5">
-                Kalkulasi total hadir dan persentase kehadiran masing-masing siswa
+                Formula rekap kehadiran dan persentase setiap siswa
               </div>
             </div>
           </div>

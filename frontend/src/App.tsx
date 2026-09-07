@@ -10,14 +10,14 @@ export const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<'kiosk' | 'dashboard' | 'students' | 'register' | 'reports'>('kiosk');
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
-      {/* Top Navbar */}
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+      {/* Top Navigation Bar */}
       <Navbar
         currentPage={currentPage}
         onNavigate={page => setCurrentPage(page)}
       />
 
-      {/* Page Content */}
+      {/* Main Workspace Area */}
       <main className="flex-1 flex flex-col">
         {currentPage === 'kiosk' && (
           <KioskPage onGoToDashboard={() => setCurrentPage('dashboard')} />
@@ -39,11 +39,12 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Subtle Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-4 px-6 text-center text-xs text-slate-500">
-        <p>
-          © 2026 Sistem Presensi Siswa Face Recognition • SKH Santo Fransiskus Asisi
-        </p>
+      {/* Minimal Enterprise Footer */}
+      <footer className="border-t border-slate-800/80 bg-[#090d16] py-3.5 px-6 text-center text-xs text-slate-400">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>Sistem Presensi Siswa Face Recognition • SKH Santo Fransiskus Asisi</span>
+          <span className="text-[11px] text-slate-400">PWA Offline-First & Realtime Supabase Database</span>
+        </div>
       </footer>
     </div>
   );

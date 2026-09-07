@@ -104,40 +104,40 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
             Data Siswa & Pendaftaran Wajah
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Kelola profil siswa SKH dan vektor embedding pengenalan wajah
           </p>
         </div>
 
         <button
           onClick={() => onNavigate('register')}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition"
+          className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition"
         >
           <Plus className="w-4 h-4" />
-          <span>Daftar Siswa Baru (Pose Wajah AI)</span>
+          <span>Daftar Siswa Baru</span>
         </button>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Cari nama, panggilan, NIS..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
           />
         </div>
 
         <select
           value={selectedClass}
           onChange={e => setSelectedClass(e.target.value)}
-          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+          className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300 focus:outline-none focus:border-blue-500 transition"
         >
           <option value="all">Semua Kelas SKH</option>
           <option value="Kelas 1 Autis">Kelas 1 Autis</option>
@@ -148,27 +148,27 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
 
       {/* Student Cards Grid */}
       {isLoading ? (
-        <div className="py-16 text-center text-slate-400">Memuat data siswa...</div>
+        <div className="py-16 text-center text-xs text-slate-400">Memuat data siswa...</div>
       ) : students.length === 0 ? (
-        <div className="py-16 text-center rounded-3xl glass-panel border border-slate-800 text-slate-400">
-          <Users className="w-12 h-12 mx-auto mb-3 text-slate-500 opacity-50" />
-          <p className="text-base font-semibold text-slate-300">Belum ada siswa terdaftar</p>
+        <div className="py-16 text-center rounded-lg bg-slate-900/60 border border-slate-800 text-slate-400">
+          <Users className="w-10 h-10 mx-auto mb-2.5 text-slate-600" />
+          <p className="text-sm font-semibold text-slate-300">Belum ada siswa terdaftar</p>
           <p className="text-xs text-slate-500 mt-1">
-            Klik tombol "Daftar Siswa Baru" untuk mendaftarkan siswa dengan pemindaian wajah.
+            Klik tombol "Daftar Siswa Baru" untuk mendaftarkan siswa baru.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {students.map(student => (
             <div
               key={student.id}
-              className="rounded-2xl glass-panel p-5 border border-slate-800 hover:border-slate-700 flex flex-col justify-between transition group"
+              className="rounded-lg bg-slate-900/60 p-4 border border-slate-800 hover:border-slate-700 flex flex-col justify-between transition group"
             >
               <div>
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3.5">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3">
                     {/* Face Photo */}
-                    <div className="w-14 h-14 rounded-2xl bg-slate-800 border-2 border-slate-700 overflow-hidden flex items-center justify-center font-black text-emerald-400 text-xl shadow-md">
+                    <div className="w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center font-bold text-blue-400 text-lg flex-shrink-0">
                       {student.latest_photo ? (
                         <img
                           src={student.latest_photo}
@@ -181,13 +181,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                     </div>
 
                     <div>
-                      <h4 className="text-base font-bold text-white group-hover:text-emerald-300 transition">
+                      <h4 className="text-sm font-semibold text-white group-hover:text-blue-400 transition">
                         {student.full_name}
                       </h4>
-                      <div className="text-xs font-semibold text-emerald-400">
-                        Nama Panggilan: "{student.nickname}"
+                      <div className="text-xs text-slate-400">
+                        Panggilan: <span className="text-slate-300 font-medium">{student.nickname}</span>
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">NIS: {student.nis}</div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">NIS: {student.nis}</div>
                     </div>
                   </div>
 
@@ -195,68 +195,68 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleOpenEdit(student)}
-                      className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition"
+                      className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
                       title="Ubah Data Siswa"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteConfirmId(student.id)}
-                      className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                      className="p-1.5 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition"
                       title="Hapus Siswa"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
-                <div className="space-y-2 py-3 border-y border-slate-800/80 text-xs">
+                <div className="space-y-1.5 py-2.5 border-y border-slate-800/80 text-xs">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Kelas:</span>
-                    <span className="font-semibold text-slate-200">{student.class_name}</span>
+                    <span className="font-medium text-slate-200">{student.class_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Kebutuhan Khusus:</span>
-                    <span className="font-semibold text-slate-200">{student.category}</span>
+                    <span className="text-slate-400">Kebutuhan:</span>
+                    <span className="font-medium text-slate-200">{student.category}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Vektor Wajah Terdaftar:</span>
-                    <span className="font-semibold text-emerald-400 flex items-center gap-1">
-                      <Camera className="w-3.5 h-3.5" />
-                      {student.photo_count || 1} Sampel Embedding
+                    <span className="text-slate-400">Vektor Wajah:</span>
+                    <span className="font-medium text-blue-400 font-mono flex items-center gap-1">
+                      <Camera className="w-3 h-3" />
+                      {student.photo_count || 1} Embedding
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Status Footer */}
-              <div className="flex items-center justify-between pt-4 mt-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <div className="flex items-center justify-between pt-3 mt-1">
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   <UserCheck className="w-3 h-3" />
                   Aktif Presensi
                 </span>
-                <span className="text-[10px] text-slate-500">
-                  Terdaftar {new Date(student.created_at).toLocaleDateString('id-ID')}
+                <span className="text-[10px] text-slate-500 font-mono">
+                  {new Date(student.created_at).toLocaleDateString('id-ID')}
                 </span>
               </div>
 
               {/* Delete Modal Confirmation */}
               {deleteConfirmId === student.id && (
-                <div className="mt-4 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200 animate-fadeIn">
+                <div className="mt-3 p-3 rounded-lg bg-rose-950/40 border border-rose-900/50 text-xs text-rose-200 animate-fadeIn">
                   <div className="font-bold mb-1">Konfirmasi Hapus Siswa?</div>
-                  <p className="text-[11px] text-rose-300/80 mb-3">
-                    Seluruh riwayat presensi dan data vektor wajah siswa ini akan dihapus permanen dari Supabase Cloud.
+                  <p className="text-[11px] text-rose-300/80 mb-2.5 leading-relaxed">
+                    Data riwayat dan foto wajah siswa akan dihapus permanen dari Supabase Cloud.
                   </p>
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-1.5">
                     <button
                       onClick={() => setDeleteConfirmId(null)}
-                      className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+                      className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
                     >
                       Batal
                     </button>
                     <button
                       onClick={() => handleDelete(student.id)}
-                      className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs"
+                      className="px-3 py-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs"
                     >
                       Ya, Hapus
                     </button>
@@ -270,37 +270,37 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
 
       {/* Edit Student Modal */}
       {editingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-2xl space-y-4 text-slate-100">
             {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
-                  <Edit3 className="w-5 h-5" />
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+                  <Edit3 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Ubah Data Siswa</h3>
-                  <p className="text-xs text-slate-400">Perubahan akan langsung tersimpan di Supabase Cloud</p>
+                  <h3 className="text-sm font-bold text-white">Ubah Data Siswa</h3>
+                  <p className="text-[11px] text-slate-400">Sinkronisasi otomatis dengan Supabase Cloud</p>
                 </div>
               </div>
               <button
                 onClick={() => setEditingStudent(null)}
-                className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {editError && (
-              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
+              <div className="p-2.5 rounded-lg bg-rose-950/50 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{editError}</span>
               </div>
             )}
 
-            <form onSubmit={handleSaveEdit} className="space-y-4">
+            <form onSubmit={handleSaveEdit} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-300 mb-1">
                   Nomor Induk Siswa (NIS) <span className="text-rose-400">*</span>
                 </label>
                 <input
@@ -308,13 +308,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                   required
                   value={editFormData.nis}
                   onChange={e => setEditFormData({ ...editFormData, nis: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                  className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 transition"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     Nama Lengkap <span className="text-rose-400">*</span>
                   </label>
                   <input
@@ -322,12 +322,12 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                     required
                     value={editFormData.full_name}
                     onChange={e => setEditFormData({ ...editFormData, full_name: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     Nama Panggilan <span className="text-rose-400">*</span>
                   </label>
                   <input
@@ -335,20 +335,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                     required
                     value={editFormData.nickname}
                     onChange={e => setEditFormData({ ...editFormData, nickname: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 transition"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     Kelas SKH
                   </label>
                   <select
                     value={editFormData.class_name}
                     onChange={e => setEditFormData({ ...editFormData, class_name: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 transition"
                   >
                     <option value="Kelas 1 Autis">Kelas 1 Autis</option>
                     <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
@@ -357,33 +357,33 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    Kategori Kebutuhan Khusus
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Kategori Kebutuhan
                   </label>
                   <input
                     type="text"
                     value={editFormData.category}
                     onChange={e => setEditFormData({ ...editFormData, category: e.target.value })}
-                    placeholder="Contoh: Autis, Tunarungu, Umum"
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                    placeholder="Contoh: Autis, Tunarungu"
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 transition"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setEditingStudent(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingEdit}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
                 >
-                  <Check className="w-4 h-4" />
+                  <Check className="w-3.5 h-3.5" />
                   <span>{isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
                 </button>
               </div>

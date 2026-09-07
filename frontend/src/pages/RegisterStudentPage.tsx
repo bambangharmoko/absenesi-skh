@@ -398,77 +398,77 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
             <span>Pendaftaran Wajah Siswa</span>
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
-              Face ID Scanner
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              Face ID
             </span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Perekaman wajah otomatis 4 arah (Depan, Kanan, Kiri, Atas) yang bersih dan cepat
+          <p className="text-xs text-slate-400 mt-1">
+            Perekaman wajah 4 arah (Depan, Kanan, Kiri, Atas) untuk identifikasi presensi
           </p>
         </div>
 
         <button
           onClick={onCancel}
-          className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:bg-slate-800 transition"
+          className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:bg-slate-800 transition"
         >
           Batal
         </button>
       </div>
 
       {/* Step Stepper Progress */}
-      <div className="flex items-center justify-between p-4 rounded-2xl glass-panel border border-slate-800">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between p-3.5 rounded-lg bg-slate-900/60 border border-slate-800">
+        <div className="flex items-center gap-2.5">
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-              step >= 1 ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30' : 'bg-slate-800 text-slate-400'
+            className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
+              step >= 1 ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-800 text-slate-400'
             }`}
           >
             1
           </div>
           <div>
-            <div className="text-xs font-bold text-white">Langkah 1</div>
-            <div className="text-[11px] text-slate-400">Biodata Siswa</div>
+            <div className="text-xs font-semibold text-white">Biodata</div>
+            <div className="text-[10px] text-slate-400">Identitas Siswa</div>
           </div>
         </div>
 
-        <div className="h-0.5 flex-1 mx-4 bg-slate-800 hidden sm:block" />
+        <div className="h-px flex-1 mx-4 bg-slate-800 hidden sm:block" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-              step >= 2 ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30' : 'bg-slate-800 text-slate-400'
+            className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
+              step >= 2 ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-800 text-slate-400'
             }`}
           >
             2
           </div>
           <div>
-            <div className="text-xs font-bold text-white">Langkah 2</div>
-            <div className="text-[11px] text-slate-400">Pemindaian Wajah</div>
+            <div className="text-xs font-semibold text-white">Pemindaian</div>
+            <div className="text-[10px] text-slate-400">Sampel Wajah</div>
           </div>
         </div>
 
-        <div className="h-0.5 flex-1 mx-4 bg-slate-800 hidden sm:block" />
+        <div className="h-px flex-1 mx-4 bg-slate-800 hidden sm:block" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-              step === 3 ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30' : 'bg-slate-800 text-slate-400'
+            className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
+              step === 3 ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-800 text-slate-400'
             }`}
           >
             3
           </div>
           <div>
-            <div className="text-xs font-bold text-white">Langkah 3</div>
-            <div className="text-[11px] text-slate-400">Konfirmasi & Simpan</div>
+            <div className="text-xs font-semibold text-white">Konfirmasi</div>
+            <div className="text-[10px] text-slate-400">Simpan ke Cloud</div>
           </div>
         </div>
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-950/50 border border-rose-500/40 text-rose-300 text-xs font-semibold flex items-center gap-3 animate-fadeIn">
-          <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+        <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-fadeIn">
+          <ShieldAlert className="w-4 h-4 flex-shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -477,61 +477,61 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
       {/* STEP 1: BIODATA FORM */}
       {/* ========================================================================= */}
       {step === 1 && (
-        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-5 animate-fadeIn">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <User className="w-4 h-4 text-emerald-400" />
-            <span>Informasi Pribadi & Identitas Siswa</span>
+        <div className="p-5 rounded-lg bg-slate-900/60 border border-slate-800 space-y-4 animate-fadeIn">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <User className="w-4 h-4 text-blue-400" />
+            <span>Informasi Identitas Siswa</span>
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                Nomor Induk Siswa (NIS) <span className="text-emerald-400">*</span>
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Nomor Induk Siswa (NIS) <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
                 value={formData.nis}
                 onChange={e => setFormData({ ...formData, nis: e.target.value })}
                 placeholder="Contoh: SKH-2026-001"
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition placeholder-slate-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 transition placeholder-slate-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                Nama Panggilan / Sapaan <span className="text-emerald-400">*</span>
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Nama Panggilan / Sapaan <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
                 value={formData.nickname}
                 onChange={e => setFormData({ ...formData, nickname: e.target.value })}
                 placeholder="Contoh: Jonathan / Jo"
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition placeholder-slate-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 transition placeholder-slate-500"
               />
-              <p className="text-[11px] text-slate-500 mt-1">Nama ini yang akan disapa ramah oleh suara sistem</p>
+              <p className="text-[10px] text-slate-500 mt-1">Nama ini yang akan disapa ramah oleh suara sistem</p>
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                Nama Lengkap Siswa <span className="text-emerald-400">*</span>
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Nama Lengkap Siswa <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
                 value={formData.full_name}
                 onChange={e => setFormData({ ...formData, full_name: e.target.value })}
-                placeholder="Nama lengkap sesuai dokumen pendaftaran"
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition placeholder-slate-500"
+                placeholder="Nama lengkap sesuai dokumen resmi"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 transition placeholder-slate-500"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Kelas SKH
               </label>
               <select
                 value={formData.class_name}
                 onChange={e => setFormData({ ...formData, class_name: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 transition"
               >
                 <option value="Kelas 1 Autis">Kelas 1 Autis</option>
                 <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
@@ -542,7 +542,7 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Kebutuhan Khusus / Kategori
               </label>
               <input
@@ -550,12 +550,12 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                 value={formData.category}
                 onChange={e => setFormData({ ...formData, category: e.target.value })}
                 placeholder="Contoh: Autism Spectrum / Tunarungu"
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition placeholder-slate-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 transition placeholder-slate-500"
               />
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-slate-800">
+          <div className="flex justify-end pt-3 border-t border-slate-800">
             <button
               onClick={() => {
                 if (!formData.nis.trim() || !formData.full_name.trim() || !formData.nickname.trim()) {
@@ -565,10 +565,10 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                 setErrorMsg(null);
                 setStep(2);
               }}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition transform active:scale-95"
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition"
             >
               <span>Lanjut ke Pemindaian Wajah</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -578,26 +578,26 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
       {/* STEP 2: CLEAN MINIMALIST FACE SCANNER */}
       {/* ========================================================================= */}
       {step === 2 && (
-        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-6 animate-fadeIn">
+        <div className="p-5 rounded-lg bg-slate-900/60 border border-slate-800 space-y-5 animate-fadeIn">
           {/* Header & Mode Switcher */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-black text-white flex items-center gap-2">
-                <Scan className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Scan className="w-4 h-4 text-blue-400" />
                 <span>Pemindaian Wajah Otomatis (Face ID)</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Cukup klik <b>Mulai Pemindaian</b> lalu ikuti panduan arah wajah
+                Klik <b>Mulai Pemindaian</b> lalu ikuti arahan posisi wajah
               </p>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsFaceIdMode(!isFaceIdMode)}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition"
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300 hover:text-white flex items-center gap-1.5 transition"
               >
-                <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{isFaceIdMode ? 'Beralih ke Foto Manual' : 'Gunakan Pemindaian Otomatis'}</span>
+                <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                <span>{isFaceIdMode ? 'Foto Manual' : 'Otomatis Face ID'}</span>
               </button>
             </div>
           </div>
@@ -606,9 +606,9 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
           {/* MINIMALIST FACE ID SCANNER */}
           {/* ======================= */}
           {isFaceIdMode ? (
-            <div className="flex flex-col items-center justify-center space-y-6 py-2">
+            <div className="flex flex-col items-center justify-center space-y-5 py-2">
               {/* Minimalist Circular Viewport with Clean Progress Ring */}
-              <div className="relative w-72 h-72 sm:w-80 sm:h-80 flex items-center justify-center">
+              <div className="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center">
                 {/* SVG Smooth Progress Ring */}
                 <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none">
                   {/* Track Circle */}
@@ -618,7 +618,7 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                     r={circleRadius}
                     fill="none"
                     stroke="#1e293b"
-                    strokeWidth="6"
+                    strokeWidth="4"
                   />
                   {/* Progress Arc */}
                   <circle
@@ -626,8 +626,8 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                     cy="50%"
                     r={circleRadius}
                     fill="none"
-                    stroke="#10b981"
-                    strokeWidth="6"
+                    stroke="#2563eb"
+                    strokeWidth="4"
                     strokeLinecap="round"
                     strokeDasharray={circumference}
                     strokeDashoffset={strokeDashoffset}
@@ -637,8 +637,8 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
 
                 {/* Circular Camera Container */}
                 <div
-                  className={`relative w-56 h-56 sm:w-64 sm:h-64 rounded-full overflow-hidden border-2 bg-slate-950 shadow-2xl flex items-center justify-center transition-all duration-300 ${
-                    isScanningActive ? 'border-emerald-500/80 shadow-emerald-500/20' : 'border-slate-700'
+                  className={`relative w-48 h-48 sm:w-56 sm:h-56 rounded-full overflow-hidden border bg-slate-950 flex items-center justify-center transition-all duration-300 ${
+                    isScanningActive ? 'border-blue-500' : 'border-slate-800'
                   }`}
                 >
                   <video
@@ -649,37 +649,36 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                     className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
                   />
 
-                  {/* Clean Face Guide Oval */}
+                  {/* Face Guide Oval */}
                   <div
-                    className={`w-32 h-44 rounded-[50%] border-2 border-dashed pointer-events-none transition-all duration-300 ${
-                      isScanningActive ? 'border-emerald-400/70 scale-105' : 'border-slate-500/40'
+                    className={`w-28 h-36 rounded-[50%] border border-dashed pointer-events-none transition-all duration-300 ${
+                      isScanningActive ? 'border-blue-400/80 scale-105' : 'border-slate-600/40'
                     }`}
                   />
                 </div>
               </div>
 
-              {/* Clean Direction Badges (Depan, Kanan, Kiri, Atas) */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-lg">
+              {/* Direction Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full max-w-lg">
                 {POSE_TARGETS.map((t, idx) => {
                   const isDone = Boolean(capturedSamples[t.id]);
                   const isCurrent = isScanningActive && currentPromptIndex === idx;
                   return (
                     <div
                       key={t.id}
-                      className={`p-3 rounded-2xl border transition-all duration-300 flex flex-col items-center justify-center gap-1 text-center ${
+                      className={`p-2.5 rounded-lg border transition-all duration-300 flex flex-col items-center justify-center gap-1 text-center ${
                         isDone
-                          ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-300'
+                          ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300'
                           : isCurrent
-                          ? 'bg-amber-950/40 border-amber-400 text-amber-200 animate-pulse'
-                          : 'bg-slate-900/80 border-slate-800 text-slate-400'
+                          ? 'bg-blue-950/40 border-blue-500 text-blue-200'
+                          : 'bg-slate-950 border-slate-800 text-slate-400'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base">{t.icon}</span>
-                        <span className="text-xs font-bold">{t.label}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-semibold">{t.label}</span>
                       </div>
-                      <span className="text-[10px] font-semibold">
-                        {isDone ? 'Selesai ✓' : isCurrent ? 'Sekarang' : 'Menunggu'}
+                      <span className="text-[10px]">
+                        {isDone ? 'Selesai ✓' : isCurrent ? 'Pindai...' : 'Menunggu'}
                       </span>
                     </div>
                   );
@@ -687,37 +686,37 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
               </div>
 
               {/* Instructions & Controls */}
-              <div className="w-full max-w-md text-center space-y-4">
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400">Instruksi:</div>
-                  <div className="text-base font-bold text-white">
+              <div className="w-full max-w-md text-center space-y-3.5">
+                <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-0.5">
+                  <div className="text-[11px] text-slate-400 uppercase tracking-wider font-medium">Instruksi:</div>
+                  <div className="text-xs sm:text-sm font-semibold text-white">
                     {isScanningActive && currentTarget
                       ? currentTarget.instruction
                       : scanProgress === 100
-                      ? '✅ Wajah berhasil dipindai dengan lengkap!'
+                      ? 'Wajah berhasil dipindai lengkap'
                       : 'Klik tombol Mulai Pemindaian di bawah'}
                   </div>
-                  <div className="text-[11px] text-emerald-400">
-                    {isScanningActive && currentTarget ? currentTarget.tip : 'Siswa cukup menatap kamera dengan santai'}
+                  <div className="text-[11px] text-blue-400">
+                    {isScanningActive && currentTarget ? currentTarget.tip : 'Tatap kamera dengan wajar dan santai'}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center gap-2.5">
                   {!isScanningActive ? (
                     <button
                       onClick={handleStart3dScan}
-                      className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-sm sm:text-base flex items-center gap-2.5 shadow-xl shadow-emerald-600/40 transition transform active:scale-95"
+                      className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition"
                     >
-                      <Play className="w-5 h-5 fill-current" />
-                      <span>{scanProgress > 0 ? 'Ulangi Pemindaian' : 'Mulai Pemindaian Wajah'}</span>
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>{scanProgress > 0 ? 'Ulangi Pemindaian' : 'Mulai Pemindaian'}</span>
                     </button>
                   ) : (
                     <button
                       onClick={handleResetScan}
-                      className="px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center gap-2 transition"
+                      className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs flex items-center gap-1.5 transition"
                     >
-                      <RotateCcw className="w-4 h-4" />
-                      <span>Hentikan / Ulangi</span>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Hentikan</span>
                     </button>
                   )}
                 </div>
@@ -727,8 +726,8 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
             /* ======================= */
             /* MANUAL PHOTO FALLBACK */
             /* ======================= */
-            <div className="space-y-4">
-              <div className="relative w-full h-72 rounded-3xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+            <div className="space-y-3.5">
+              <div className="relative w-full h-64 rounded-lg overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -738,26 +737,26 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                 />
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {POSE_TARGETS.map((t, idx) => (
-                  <div key={t.id} className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center gap-2">
-                    <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-800 flex items-center justify-center border border-slate-700">
+                  <div key={t.id} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex flex-col items-center gap-2">
+                    <div className="w-16 h-16 rounded-md overflow-hidden bg-slate-800 flex items-center justify-center border border-slate-700">
                       {manualPhotos[idx] ? (
                         <img src={manualPhotos[idx]!} alt={t.label} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-2xl">{t.icon}</span>
+                        <span className="text-xl">{t.icon}</span>
                       )}
                     </div>
-                    <span className="text-[11px] font-bold text-slate-300 text-center truncate w-full">{t.label}</span>
+                    <span className="text-xs font-medium text-slate-300 text-center truncate w-full">{t.label}</span>
                     <div className="flex items-center gap-1.5 w-full">
                       <button
                         onClick={() => handleManualCapture(idx)}
-                        className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold"
+                        className="flex-1 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-medium"
                       >
                         Foto
                       </button>
-                      <label className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">
-                        <Upload className="w-3 h-3" />
+                      <label className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer">
+                        <Upload className="w-3.5 h-3.5" />
                         <input
                           type="file"
                           accept="image/*"
@@ -776,16 +775,16 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
           <canvas ref={canvasRef} className="hidden" />
 
           {/* Navigation Footer */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-800">
             <button
               onClick={() => {
                 stopCamera();
                 setStep(1);
               }}
-              className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold flex items-center gap-2 border border-slate-800 transition"
+              className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Kembali ke Biodata</span>
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Kembali</span>
             </button>
 
             <button
@@ -800,10 +799,10 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                 setErrorMsg(null);
                 setStep(3);
               }}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition"
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition"
             >
               <span>Lanjut ke Konfirmasi</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -813,32 +812,32 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
       {/* STEP 3: REVIEW & FINAL ENROLLMENT SUBMISSION */}
       {/* ========================================================================= */}
       {step === 3 && (
-        <div className="p-6 rounded-3xl glass-panel border border-slate-800 space-y-6 animate-fadeIn">
+        <div className="p-5 rounded-lg bg-slate-900/60 border border-slate-800 space-y-5 animate-fadeIn">
           <div className="text-center space-y-1">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mx-auto flex items-center justify-center mb-2">
-              <CheckCircle2 className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 mx-auto flex items-center justify-center mb-2">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
-            <h3 className="text-xl font-black text-white">Konfirmasi Data Siswa & Sampel Wajah</h3>
-            <p className="text-xs text-slate-400">Pastikan biodata dan 4 sampel foto wajah sudah sesuai</p>
+            <h3 className="text-base font-bold text-white">Konfirmasi Data & Sampel Wajah</h3>
+            <p className="text-xs text-slate-400">Pastikan biodata dan foto wajah siswa sudah benar</p>
           </div>
 
           {/* Student Info Card */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <div className="text-xs text-slate-400">NIS Siswa</div>
-              <div className="font-bold text-white mt-0.5">{formData.nis}</div>
+              <div className="text-[11px] text-slate-400">NIS Siswa</div>
+              <div className="font-semibold text-white mt-0.5 font-mono">{formData.nis}</div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">Nama Panggilan</div>
-              <div className="font-bold text-emerald-400 mt-0.5">{formData.nickname}</div>
+              <div className="text-[11px] text-slate-400">Nama Panggilan</div>
+              <div className="font-semibold text-blue-400 mt-0.5">{formData.nickname}</div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">Nama Lengkap</div>
-              <div className="font-bold text-white mt-0.5">{formData.full_name}</div>
+              <div className="text-[11px] text-slate-400">Nama Lengkap</div>
+              <div className="font-semibold text-white mt-0.5">{formData.full_name}</div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">Kelas & Kategori</div>
-              <div className="font-bold text-slate-300 mt-0.5">
+              <div className="text-[11px] text-slate-400">Kelas & Kategori</div>
+              <div className="font-semibold text-slate-300 mt-0.5">
                 {formData.class_name} • <span className="text-slate-400">{formData.category}</span>
               </div>
             </div>
@@ -846,55 +845,55 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
 
           {/* Captured 4 Angle Thumbnails */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Sampel Foto Wajah yang Direkam (4 Arah):
+            <label className="block text-xs font-semibold text-slate-300 mb-2">
+              Sampel Foto Wajah:
             </label>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {isFaceIdMode
                 ? POSE_TARGETS.map(t => {
                     const sample = capturedSamples[t.id];
                     return (
-                      <div key={t.id} className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center gap-2">
-                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                      <div key={t.id} className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex flex-col items-center gap-1.5">
+                        <div className="w-16 h-16 rounded-md overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
                           {sample ? (
                             <img src={sample.photo} alt={t.label} className="w-full h-full object-cover transform scale-x-[-1]" />
                           ) : (
                             <span className="text-slate-500 text-xs">Kosong</span>
                           )}
                         </div>
-                        <span className="text-[11px] font-bold text-emerald-400">{t.label}</span>
+                        <span className="text-[11px] font-medium text-slate-300">{t.label}</span>
                       </div>
                     );
                   })
                 : manualPhotos.map((p, idx) => (
-                    <div key={idx} className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center gap-2">
-                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
+                    <div key={idx} className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex flex-col items-center gap-1.5">
+                      <div className="w-16 h-16 rounded-md overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center">
                         {p ? <img src={p} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" /> : null}
                       </div>
-                      <span className="text-[11px] font-bold text-emerald-400">Sampel {idx + 1}</span>
+                      <span className="text-[11px] font-medium text-slate-300">Sampel {idx + 1}</span>
                     </div>
                   ))}
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-800">
             <button
               onClick={() => setStep(2)}
-              className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold flex items-center gap-2 border border-slate-800 transition"
+              className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Ubah Foto / Pindai Ulang</span>
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Pindai Ulang</span>
             </button>
 
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-sm flex items-center gap-2 shadow-xl shadow-emerald-600/40 transition transform active:scale-95 disabled:opacity-50"
+              className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition disabled:opacity-50"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{isSubmitting ? 'Mendaftarkan Wajah...' : 'Simpan & Daftarkan Siswa'}</span>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{isSubmitting ? 'Mendaftarkan...' : 'Simpan Siswa'}</span>
             </button>
           </div>
         </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CameraScanner } from '../components/kiosk/CameraScanner';
 import { CelebrationModal } from '../components/kiosk/CelebrationModal';
 import { VerifyFrameResponse, api, AttendanceSummary } from '../services/api';
-import { Maximize2, Minimize2, Sparkles, Volume2, ShieldCheck, Heart } from 'lucide-react';
+import { Maximize2, Minimize2, Info, Volume2, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 interface KioskPageProps {
   onGoToDashboard: () => void;
@@ -40,30 +40,28 @@ export const KioskPage: React.FC<KioskPageProps> = ({ onGoToDashboard }) => {
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8">
-      {/* Top Banner & Quick Controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+    <div className="flex flex-col flex-1 h-full max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-4">
+      {/* Header & Controls Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              <Sparkles className="w-4 h-4" />
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+            <span>Kiosk Presensi Wajah</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-600/10 text-blue-400 border border-blue-500/20">
+              Live Scanner
             </span>
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              KIOSK PRESENSI WAJAH
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Silakan berdiri dan tatap kamera • Sistem mengenali otomatis tanpa sentuh
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Posisikan wajah di depan kamera untuk verifikasi kehadiran otomatis secara langsung.
           </p>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
           {/* Class Filter */}
           <select
             value={selectedClass}
             onChange={e => setSelectedClass(e.target.value)}
-            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-none focus:border-emerald-500 transition"
+            className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-medium text-slate-200 focus:outline-none focus:border-blue-500 transition"
           >
             <option value="all">Semua Kelas SKH</option>
             <option value="Kelas 1 Autis">Kelas 1 Autis</option>
@@ -74,7 +72,7 @@ export const KioskPage: React.FC<KioskPageProps> = ({ onGoToDashboard }) => {
           {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition"
+            className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition"
             title="Layar Penuh (Fullscreen Kiosk)"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -83,9 +81,9 @@ export const KioskPage: React.FC<KioskPageProps> = ({ onGoToDashboard }) => {
       </div>
 
       {/* Main Kiosk Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
         {/* Left: Camera Scanner HUD (8 cols) */}
-        <div className="lg:col-span-8 flex flex-col h-[520px] sm:h-[600px]">
+        <div className="lg:col-span-8 flex flex-col h-[500px] sm:h-[580px]">
           <CameraScanner
             onVerified={handleVerified}
             selectedClass={selectedClass}
@@ -93,83 +91,92 @@ export const KioskPage: React.FC<KioskPageProps> = ({ onGoToDashboard }) => {
           />
         </div>
 
-        {/* Right: Live Counter & Info Cards (4 cols) */}
+        {/* Right: Live Counter & Instruction Cards (4 cols) */}
         <div className="lg:col-span-4 flex flex-col gap-4">
           {/* Attendance Stats Widget */}
-          <div className="rounded-3xl glass-panel p-5 border border-slate-800">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
-              Ringkasan Hari Ini
-            </h4>
+          <div className="enterprise-card p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
+              <span>Ringkasan Presensi Hari Ini</span>
+              <span className="text-[11px] font-mono text-slate-400 lowercase">realtime</span>
+            </h2>
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30">
-                <div className="text-2xl font-black text-emerald-400">
+            <div className="grid grid-cols-2 gap-2.5 mb-3">
+              <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
+                <div className="text-2xl font-bold text-emerald-400 font-mono tabular-nums">
                   {summary ? summary.total_present : 0}
                 </div>
-                <div className="text-xs font-semibold text-emerald-200/80 mt-0.5">Hadir Tepat Waktu</div>
+                <div className="text-[11px] font-medium text-slate-300 mt-0.5">Tepat Waktu</div>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/30">
-                <div className="text-2xl font-black text-amber-400">
+              <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
+                <div className="text-2xl font-bold text-amber-400 font-mono tabular-nums">
                   {summary ? summary.total_late : 0}
                 </div>
-                <div className="text-xs font-semibold text-amber-200/80 mt-0.5">Terlambat</div>
+                <div className="text-[11px] font-medium text-slate-300 mt-0.5">Terlambat</div>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-blue-950/40 border border-blue-500/30">
-                <div className="text-2xl font-black text-blue-400">
+              <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
+                <div className="text-2xl font-bold text-sky-400 font-mono tabular-nums">
                   {summary ? summary.total_permission + summary.total_sick : 0}
                 </div>
-                <div className="text-xs font-semibold text-blue-200/80 mt-0.5">Izin / Sakit</div>
+                <div className="text-[11px] font-medium text-slate-300 mt-0.5">Izin / Sakit</div>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-700">
-                <div className="text-2xl font-black text-slate-300">
+              <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
+                <div className="text-2xl font-bold text-slate-200 font-mono tabular-nums">
                   {summary ? summary.total_students : 0}
                 </div>
-                <div className="text-xs font-semibold text-slate-400 mt-0.5">Total Siswa</div>
+                <div className="text-[11px] font-medium text-slate-400 mt-0.5">Total Siswa</div>
               </div>
             </div>
 
             {/* Attendance Progress Bar */}
-            <div className="pt-2">
-              <div className="flex justify-between text-xs font-semibold text-slate-400 mb-1.5">
-                <span>Persentase Kehadiran</span>
-                <span className="text-emerald-400 font-bold">{summary?.attendance_rate || 0}%</span>
+            <div className="pt-2 border-t border-slate-800">
+              <div className="flex justify-between text-xs font-medium text-slate-400 mb-1.5">
+                <span>Rasio Kehadiran</span>
+                <span className="text-slate-200 font-mono font-semibold">{summary?.attendance_rate || 0}%</span>
               </div>
-              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+                  className="h-full bg-blue-600 rounded-full transition-all duration-300"
                   style={{ width: `${summary?.attendance_rate || 0}%` }}
                 />
               </div>
             </div>
           </div>
 
-          {/* Child-Friendly Guidance Card */}
-          <div className="rounded-3xl bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-900 p-5 border border-indigo-500/20 flex flex-col justify-between flex-1">
+          {/* Professional Guidance Card */}
+          <div className="enterprise-card p-4 flex flex-col justify-between flex-1 gap-3">
             <div>
-              <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">
-                <Heart className="w-4 h-4 text-pink-400 animate-pulse" />
-                <span>Petunjuk Ramah Anak</span>
+              <div className="flex items-center gap-1.5 text-blue-400 text-xs font-semibold mb-2">
+                <Info className="w-4 h-4" />
+                <span>Petunjuk Penggunaan Kiosk</span>
               </div>
-              <h5 className="text-base font-bold text-white mb-2">
-                "Senyum Ceria & Tatap Kamera"
-              </h5>
-              <p className="text-xs text-slate-300 leading-relaxed mb-4">
-                Sistem akan memutar ucapan selamat pagi dengan nama siswa dan efek suara ramah saat wajah berhasil terverifikasi.
-              </p>
+              <ul className="space-y-2 text-xs text-slate-300 leading-relaxed">
+                <li className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded bg-slate-800 text-slate-300 flex items-center justify-center font-mono text-[10px] shrink-0 mt-0.5">1</span>
+                  <span>Berdiri di depan kamera dalam jarak ideal 0.5 – 1.2 meter.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded bg-slate-800 text-slate-300 flex items-center justify-center font-mono text-[10px] shrink-0 mt-0.5">2</span>
+                  <span>Tatap kamera dengan tenang hingga kotak verifikasi mendeteksi wajah.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded bg-slate-800 text-slate-300 flex items-center justify-center font-mono text-[10px] shrink-0 mt-0.5">3</span>
+                  <span>Nama siswa, status masuk/pulang, dan suara sambutan otomatis diputar.</span>
+                </li>
+              </ul>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex items-center gap-2">
-              <Volume2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <span>Dilengkapi Text-to-Speech Suara Bahasa Indonesia</span>
+            <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-400 flex items-center gap-2">
+              <Volume2 className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>Audio Feedback Bahasa Indonesia Aktif</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Celebration Popup Modal */}
+      {/* Confirmation Modal */}
       <CelebrationModal
         data={celebrationData}
         onClose={() => setCelebrationData(null)}
