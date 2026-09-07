@@ -27,6 +27,15 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     fetchStudents();
+
+    const handleDbUpdate = () => {
+      fetchStudents();
+    };
+
+    window.addEventListener('skh_db_updated', handleDbUpdate);
+    return () => {
+      window.removeEventListener('skh_db_updated', handleDbUpdate);
+    };
   }, [selectedClass, searchTerm]);
 
   const handleDelete = async (studentId: string) => {

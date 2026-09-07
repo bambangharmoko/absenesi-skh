@@ -85,6 +85,15 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
   useEffect(() => {
     loadStudents();
+
+    const handleDbUpdate = () => {
+      loadStudents();
+    };
+
+    window.addEventListener('skh_db_updated', handleDbUpdate);
+    return () => {
+      window.removeEventListener('skh_db_updated', handleDbUpdate);
+    };
   }, [loadStudents]);
 
   // Stop Camera & Force Release Hardware Device

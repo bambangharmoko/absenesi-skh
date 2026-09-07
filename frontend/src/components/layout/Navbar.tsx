@@ -10,7 +10,6 @@ import {
   Database,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../../services/supabase';
-import { SupabaseConfigModal } from './SupabaseConfigModal';
 
 interface NavbarProps {
   currentPage: 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports';
@@ -23,12 +22,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate, onRefre
   const [dateStr, setDateStr] = useState<string>('');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState<boolean>(false);
-  const [isDbModalOpen, setIsDbModalOpen] = useState<boolean>(false);
-  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
-
-  useEffect(() => {
-    setIsCloudConnected(isSupabaseConfigured());
-  }, [isDbModalOpen]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -148,22 +141,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate, onRefre
 
             {/* Right Buttons: Supabase Cloud Button, Clock, PWA Install */}
             <div className="flex items-center gap-2.5">
-              {/* Supabase Cloud Connection Button */}
-              <button
-                onClick={() => setIsDbModalOpen(true)}
-                title="Konfigurasi Sinkronisasi Supabase Database Cloud"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition shadow-sm ${
-                  isCloudConnected
-                    ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60'
-                    : 'bg-amber-950/60 border-amber-500/50 text-amber-300 hover:bg-amber-900/60 animate-pulse'
-                }`}
+              {/* Supabase Cloud Status Indicator (Read-only, Realtime) */}
+              <div
+                title="Sinkronisasi Supabase Cloud Real-time Aktif"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold shadow-sm select-none"
               >
-                <Cloud className="w-4 h-4 text-emerald-400" />
-                <span className="hidden sm:inline">
-                  {isCloudConnected ? 'Cloud Supabase: Aktif' : 'Sambungkan Supabase'}
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="sm:hidden">{isCloudConnected ? 'Cloud' : 'Sambungkan'}</span>
-              </button>
+                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Supabase Realtime</span>
+                <span className="sm:hidden">Cloud</span>
+              </div>
 
               {/* Live Clock Widget */}
               <div className="hidden lg:flex flex-col items-end px-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800">
@@ -237,18 +227,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate, onRefre
         </div>
       </header>
 
-      {/* Supabase Connection Settings Modal */}
-      <SupabaseConfigModal
-        isOpen={isDbModalOpen}
-        onClose={() => {
-          setIsDbModalOpen(false);
-          setIsCloudConnected(isSupabaseConfigured());
-        }}
-        onSyncSuccess={() => {
-          setIsCloudConnected(true);
-          if (onRefreshData) onRefreshData();
-        }}
-      />
+
     </>
   );
 };

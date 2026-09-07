@@ -43,10 +43,12 @@ export interface AttendanceRecord {
 class DatabaseService {
   private studentsKey = 'skh_students_v3';
   private attendancesKey = 'skh_attendances_v3';
+  private isSubscribedToRealtime = false;
 
   constructor() {
     this.initDatabase();
     this.syncFromSupabase();
+    this.setupRealtimeSubscription();
   }
 
   private initDatabase() {
@@ -116,11 +118,106 @@ class DatabaseService {
   }
 
   /**
-   * Automatically fetch live students & embeddings from Supabase Cloud
+   * Mengatur langganan Supabase Realtime (PostgreSQL Changes)
+   * Saat ada siswa baru/absen masuk dari perangkat manapun, UI langsung terupdate secara real-time.
+   */
+  private setupRealtimeSubscription() {
+    if (this.isSubscribedToRealtime || typeof window === 'undefined') return;
+
+    try {
+      this.isSubscribedToRealtime = true;
+      supabase
+        .channel('skh_realtime_db')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'students' },
+          async (payload) => {
+            console.log('[Supabase Realtime] Perubahan tabel students terdeteksi:', payload.eventType);
+            await this.syncFromSupabase();
+            window.dispatchEvent(new CustomEvent('skh_db_updated'));
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'face_embeddings' },
+          async (payload) => {
+            console.log('[Supabase Realtime] Perubahan face_embeddings terdeteksi:', payload.eventType);
+            await this.syncFromSupabase();
+            window.dispatchEvent(new CustomEvent('skh_db_updated'));
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'attendances' },
+          async (payload) => {
+            console.log('[Supabase Realtime] Perubahan attendances terdeteksi:', payload.eventType);
+            await this.syncAttendancesFromSupabase();
+            window.dispatchEvent(new CustomEvent('skh_db_updated'));
+          }
+        )
+        .subscribe((status) => {
+          console.log('[Supabase Realtime] Status channel realtime:', status);
+        });
+    } catch (err) {
+      console.warn('[Supabase Realtime] Gagal inisialisasi langganan:', err);
+    }
+  }
+
+  /**
+   * Sinkronisasi data kehadiran siswa dari Supabase Cloud
+   */
+  async syncAttendancesFromSupabase(): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    try {
+      const { data: attData, error } = await supabase
+        .from('attendances')
+        .select('*, students(id, full_name, nickname, nis, class_name, category)')
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
+      if (error) {
+        console.error('[Database] ❌ Supabase fetch attendances error:', error);
+        return false;
+      }
+
+      if (attData) {
+        const mapped: AttendanceRecord[] = attData.map(a => {
+          const student = a.students || {};
+          return {
+            id: a.id,
+            student_id: a.student_id,
+            student_name: student.full_name || 'Siswa',
+            student_nickname: student.nickname || student.full_name || 'Siswa',
+            student_nis: student.nis || '',
+            class_name: student.class_name || '',
+            category: student.category || 'Umum',
+            date: a.date,
+            time_in: a.time_in,
+            time_out: a.time_out,
+            status: a.status || 'HADIR',
+            confidence_score: a.confidence_score ?? 1.0,
+            verification_method: a.verification_method || 'FACE_RECOGNITION',
+            captured_photo: a.captured_photo || null,
+            captured_photo_out: null,
+            notes: a.notes || null,
+            created_at: a.created_at || new Date().toISOString(),
+          };
+        });
+
+        localStorage.setItem(this.attendancesKey, JSON.stringify(mapped));
+        return true;
+      }
+    } catch (e) {
+      console.warn('[Database] Sync attendances exception:', e);
+    }
+    return false;
+  }
+
+  /**
+   * Sinkronisasi otomatis data master siswa dan vektor wajah dari Supabase Cloud
    */
   async syncFromSupabase(): Promise<boolean> {
     if (!isSupabaseConfigured()) {
-      console.warn('[Database] ⚠️ Supabase belum diatur. Gunakan tombol Pengaturan Cloud di navigasi.');
       return false;
     }
 
@@ -168,14 +265,16 @@ class DatabaseService {
         const localStudents = this.getRawStudents();
         const mergedMap = new Map<string, StudentRecord>();
 
-        // Cloud takes precedence, but keep local students that haven't pushed yet
         localStudents.forEach(s => mergedMap.set(s.nis, s));
         mapped.forEach(s => mergedMap.set(s.nis, s));
 
         const finalMerged = Array.from(mergedMap.values());
         localStorage.setItem(this.studentsKey, JSON.stringify(finalMerged));
         this.purgeOrphanAttendances();
-        console.log(`[Database] ✅ Berhasil sinkronisasi ${finalMerged.length} data siswa dengan Supabase Cloud.`);
+        console.log(`[Database] ✅ Berhasil sinkronisasi ${finalMerged.length} siswa dengan Supabase Cloud.`);
+
+        // Sync attendances as well
+        await this.syncAttendancesFromSupabase();
         return true;
       }
     } catch (e) {
@@ -218,6 +317,9 @@ class DatabaseService {
     return list.find(s => s.id === id) || null;
   }
 
+  /**
+   * Mendaftarkan atau memperbarui data siswa secara real-time ke Supabase Cloud
+   */
   async saveStudent(studentData: {
     nis: string;
     full_name: string;
@@ -230,7 +332,24 @@ class DatabaseService {
     let list: StudentRecord[] = raw ? JSON.parse(raw) : [];
 
     const existingIndex = list.findIndex(s => s.nis.trim() === studentData.nis.trim());
-    const id = existingIndex >= 0 ? list[existingIndex].id : crypto.randomUUID();
+    let id = existingIndex >= 0 ? list[existingIndex].id : crypto.randomUUID();
+
+    // Pastikan jika siswa sudah pernah tersimpan di Supabase Cloud, gunakan ID yang sama
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: cloudStudent } = await supabase
+          .from('students')
+          .select('id')
+          .eq('nis', studentData.nis.trim())
+          .maybeSingle();
+
+        if (cloudStudent?.id) {
+          id = cloudStudent.id;
+        }
+      } catch (err) {
+        console.warn('[Database] Supabase NIS check notice:', err);
+      }
+    }
 
     const embeddings = studentData.photos.map((p, idx) => ({
       id: crypto.randomUUID(),
@@ -245,7 +364,7 @@ class DatabaseService {
       full_name: studentData.full_name.trim(),
       nickname: studentData.nickname.trim(),
       class_name: studentData.class_name,
-      category: studentData.category.trim() || 'Umum',
+      category: studentData.category?.trim() || 'Umum',
       is_active: true,
       created_at: existingIndex >= 0 ? list[existingIndex].created_at : new Date().toISOString(),
       photo_count: embeddings.length,
@@ -261,7 +380,7 @@ class DatabaseService {
 
     localStorage.setItem(this.studentsKey, JSON.stringify(list));
 
-    // Push to Supabase Cloud Database
+    // Sinkronisasi Real-Time Langsung ke Database Supabase Cloud
     if (isSupabaseConfigured()) {
       try {
         const { error: sErr } = await supabase.from('students').upsert({
@@ -270,15 +389,19 @@ class DatabaseService {
           full_name: newStudent.full_name,
           nickname: newStudent.nickname,
           class_name: newStudent.class_name,
-          category: newStudent.category,
+          category: newStudent.category || 'Umum',
           is_active: true,
         });
 
         if (sErr) {
           console.error('[Database] ❌ Supabase upsert student error:', sErr);
-        } else {
-          console.log('[Database] ✅ Supabase student saved:', newStudent.full_name);
+          throw new Error(`Gagal menyimpan data siswa ke Supabase Cloud: ${sErr.message}`);
         }
+
+        console.log('[Database] ✅ Supabase student saved:', newStudent.full_name);
+
+        // Hapus embeddings lama siswa ini jika ada untuk mencegah duplikasi pose
+        await supabase.from('face_embeddings').delete().eq('student_id', newStudent.id);
 
         if (embeddings.length > 0) {
           const embPayload = embeddings.map(e => ({
@@ -288,16 +411,22 @@ class DatabaseService {
             pose_label: e.pose_label,
             photo_path: e.photo_data,
           }));
+
           const { error: embErr } = await supabase.from('face_embeddings').insert(embPayload);
           if (embErr) {
             console.error('[Database] ❌ Supabase insert embeddings error:', embErr);
-          } else {
-            console.log('[Database] ✅ Supabase embeddings inserted count:', embPayload.length);
+            throw new Error(`Gagal menyimpan foto & vektor wajah ke Supabase Cloud: ${embErr.message}`);
           }
+          console.log('[Database] ✅ Supabase embeddings inserted count:', embPayload.length);
         }
       } catch (err) {
-        console.error('[Database] ❌ Supabase push notice:', err);
+        console.error('[Database] ❌ Supabase push error:', err);
+        throw err;
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('skh_db_updated'));
     }
 
     return newStudent;
@@ -329,6 +458,11 @@ class DatabaseService {
         console.warn('[Database] Supabase delete notice:', e);
       }
     }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('skh_db_updated'));
+    }
+
     return true;
   }
 
@@ -340,7 +474,6 @@ class DatabaseService {
     const raw = localStorage.getItem(this.attendancesKey);
     let list: AttendanceRecord[] = raw ? JSON.parse(raw) : [];
 
-    // ONLY INCLUDE ATTENDANCES FOR STUDENTS WHO ACTUALLY EXIST
     const validStudents = this.getStudents();
     const validStudentIds = new Set(validStudents.map(s => s.id));
     list = list.filter(a => validStudentIds.has(a.student_id));
@@ -373,6 +506,11 @@ class DatabaseService {
         console.warn('[Database] Supabase attendance delete notice:', e);
       }
     }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('skh_db_updated'));
+    }
+
     return true;
   }
 
@@ -403,7 +541,6 @@ class DatabaseService {
 
     // MODE CHECK-OUT / PULANG
     if (mode === 'OUT' || (mode === 'AUTO' && existing && existing.time_in && !existing.time_out)) {
-      // RULE: Jika siswa belum absen masuk, tolak aksi presensi pulang!
       if (!existing || !existing.time_in) {
         return {
           status: 'NOT_CHECKED_IN',
@@ -436,7 +573,13 @@ class DatabaseService {
               notes: existing.notes,
             })
             .eq('id', existing.id);
-        } catch (e) {}
+        } catch (e) {
+          console.warn('[Database] Supabase update checkout exception:', e);
+        }
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('skh_db_updated'));
       }
 
       return {
@@ -452,15 +595,15 @@ class DatabaseService {
       return {
         status: 'ALREADY_RECORDED',
         action: 'NONE',
-        message: `Halo ${student.nickname}, presensi masuk kamu sudah tercatat hari ini pada pukul ${existing.time_in}.`,
+        message: `Halo ${student.nickname}, kamu sudah absen masuk hari ini pada pukul ${existing.time_in}.`,
         record: existing,
       };
     }
 
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const isLate = hours > 7 || (hours === 7 && minutes > 30);
-    const attendanceStatus: 'HADIR' | 'TERLAMBAT' = isLate ? 'TERLAMBAT' : 'HADIR';
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const isLate = currentHour > 7 || (currentHour === 7 && currentMinute > 30);
+    const attendanceStatus: AttendanceRecord['status'] = isLate ? 'TERLAMBAT' : 'HADIR';
 
     const newRecord: AttendanceRecord = {
       id: crypto.randomUUID(),
@@ -469,7 +612,7 @@ class DatabaseService {
       student_nickname: student.nickname,
       student_nis: student.nis,
       class_name: student.class_name,
-      category: student.category,
+      category: student.category || 'Umum',
       date: todayStr,
       time_in: timeStr,
       time_out: null,
@@ -484,7 +627,7 @@ class DatabaseService {
     allAttendances.unshift(newRecord);
     localStorage.setItem(this.attendancesKey, JSON.stringify(allAttendances));
 
-    // Sync to Supabase
+    // Sinkronisasi Real-Time ke Supabase
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('attendances').insert({
@@ -500,6 +643,10 @@ class DatabaseService {
       } catch (err) {
         console.warn('[Database] Supabase attendance push notice:', err);
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('skh_db_updated'));
     }
 
     return {

@@ -328,44 +328,58 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
       data.append('class_name', formData.class_name);
       data.append('category', formData.category.trim() || 'Umum');
 
-      const validPhotos: string[] = [];
-
       if (isFaceIdMode) {
-        Object.values(capturedSamples).forEach(s => {
-          if (s.photo) validPhotos.push(s.photo);
+        const samples = Object.values(capturedSamples)
+          .filter(s => s.photo)
+          .map(s => ({
+            pose_label: s.pose,
+            photo_data: s.photo,
+            descriptor: s.descriptor,
+          }));
+
+        if (samples.length === 0) {
+          setErrorMsg('Harap selesaikan pemindaian wajah minimal 1 sampel.');
+          setStep(2);
+          setIsSubmitting(false);
+          return;
+        }
+
+        await api.enrollStudentDirect({
+          nis: formData.nis.trim(),
+          full_name: formData.full_name.trim(),
+          nickname: formData.nickname.trim(),
+          class_name: formData.class_name,
+          category: formData.category.trim() || 'Umum',
+          samples,
         });
       } else {
-        manualPhotos.forEach(p => {
-          if (p) validPhotos.push(p);
+        const validPhotos = manualPhotos.filter(Boolean);
+        if (validPhotos.length === 0) {
+          setErrorMsg('Harap ambil foto minimal 1 sampel.');
+          setStep(2);
+          setIsSubmitting(false);
+          return;
+        }
+
+        const samples = validPhotos.map((photo, idx) => ({
+          pose_label: `Foto ${idx + 1}`,
+          photo_data: photo,
+        }));
+
+        await api.enrollStudentDirect({
+          nis: formData.nis.trim(),
+          full_name: formData.full_name.trim(),
+          nickname: formData.nickname.trim(),
+          class_name: formData.class_name,
+          category: formData.category.trim() || 'Umum',
+          samples,
         });
       }
 
-      if (validPhotos.length === 0) {
-        setErrorMsg('Harap lakukan pemindaian wajah atau ambil foto minimal 1 sampel.');
-        setStep(2);
-        setIsSubmitting(false);
-        return;
-      }
-
-      validPhotos.forEach((dataUrl, idx) => {
-        const arr = dataUrl.split(',');
-        const mimeMatch = arr[0].match(/:(.*?);/);
-        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        data.append('photos', blob, `pose_${idx + 1}.jpg`);
-      });
-
-      await api.enrollStudentFace(data);
       onSuccess();
     } catch (err: unknown) {
       console.error('Submit enrollment error:', err);
-      const message = err instanceof Error ? err.message : 'Gagal mendaftarkan siswa. Silakan periksa kembali data.';
+      const message = err instanceof Error ? err.message : 'Gagal mendaftarkan siswa ke Supabase Cloud. Silakan periksa koneksi internet.';
       setErrorMsg(message);
     } finally {
       setIsSubmitting(false);

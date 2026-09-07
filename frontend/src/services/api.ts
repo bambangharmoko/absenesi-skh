@@ -205,6 +205,54 @@ export const api = {
     };
   },
 
+  async enrollStudentDirect(payload: {
+    nis: string;
+    full_name: string;
+    nickname: string;
+    class_name: string;
+    category?: string;
+    samples: Array<{ pose_label: string; photo_data: string; descriptor?: Float32Array }>;
+  }): Promise<{ status: string; message: string; student_id: string }> {
+    const { nis, full_name, nickname, class_name, category, samples } = payload;
+    if (!nis || !full_name || !nickname) {
+      throw new Error('NIS, Nama Lengkap, dan Nama Panggilan wajib diisi.');
+    }
+
+    const processedPhotos: Array<{ pose_label: string; photo_data: string; descriptor: Float32Array }> = [];
+    for (const s of samples) {
+      let desc = s.descriptor;
+      if (!desc && s.photo_data) {
+        desc = (await faceApi.extractDescriptorFromDataUrl(s.photo_data)) || undefined;
+      }
+      if (desc) {
+        processedPhotos.push({
+          pose_label: s.pose_label,
+          photo_data: s.photo_data,
+          descriptor: desc,
+        });
+      }
+    }
+
+    if (processedPhotos.length === 0) {
+      throw new Error('Gagal memproses fitur wajah. Pastikan wajah terlihat jelas di kamera.');
+    }
+
+    const student = await db.saveStudent({
+      nis,
+      full_name,
+      nickname,
+      class_name,
+      category: category || 'Umum',
+      photos: processedPhotos,
+    });
+
+    return {
+      status: 'SUCCESS',
+      message: `Berhasil mendaftarkan ${student.full_name} ke Supabase Cloud dengan ${processedPhotos.length} sampel wajah.`,
+      student_id: student.id,
+    };
+  },
+
   async deleteStudent(studentId: string): Promise<{ status: string; message: string }> {
     await db.deleteStudent(studentId);
     return {

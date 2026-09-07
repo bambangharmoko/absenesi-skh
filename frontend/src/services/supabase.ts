@@ -1,35 +1,30 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const STORAGE_URL_KEY = 'skh_supabase_url';
-const STORAGE_ANON_KEY = 'skh_supabase_anon_key';
+// Default Production Supabase Cloud Credentials for SKH Santo Fransiskus Asisi
+const DEFAULT_SUPABASE_URL = 'https://lygoswawqplklqvnouao.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_TQrcJuq1Cx5H3F-0rJSIwQ__MLRF2bt';
 
 export function getSavedSupabaseUrl(): string {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem(STORAGE_URL_KEY);
-    if (saved) return saved.trim();
+  const envUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (envUrl && envUrl.trim().length > 0) {
+    return envUrl.trim();
   }
-  return (import.meta.env.VITE_SUPABASE_URL || 'https://lygoswawqplklqvnouao.supabase.co').trim();
+  return DEFAULT_SUPABASE_URL;
 }
 
 export function getSavedSupabaseAnonKey(): string {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem(STORAGE_ANON_KEY);
-    if (saved) return saved.trim();
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (envKey && envKey.trim().length > 0) {
+    return envKey.trim();
   }
-  return (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  return DEFAULT_SUPABASE_ANON_KEY;
 }
 
 let supabaseInstance: SupabaseClient | null = null;
 
-export function initSupabase(url?: string, anonKey?: string): SupabaseClient | null {
+export function initSupabase(url?: string, anonKey?: string): SupabaseClient {
   const targetUrl = (url || getSavedSupabaseUrl()).trim();
   const targetKey = (anonKey || getSavedSupabaseAnonKey()).trim();
-
-  if (!targetUrl || !targetKey) {
-    console.warn('[Supabase] ⚠️ Supabase Anon Key belum diatur. Menunggu konfigurasi API Key.');
-    supabaseInstance = null;
-    return null;
-  }
 
   try {
     supabaseInstance = createClient(targetUrl, targetKey, {
@@ -37,13 +32,19 @@ export function initSupabase(url?: string, anonKey?: string): SupabaseClient | n
         persistSession: true,
         autoRefreshToken: true,
       },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
     });
-    console.log('[Supabase] ✅ Supabase Client berhasil diinisialisasi untuk URL:', targetUrl);
+    console.log('[Supabase] ✅ Client terhubung otomatis ke Supabase Cloud:', targetUrl);
     return supabaseInstance;
   } catch (err) {
     console.error('[Supabase] ❌ Gagal inisialisasi Supabase client:', err);
-    supabaseInstance = null;
-    return null;
+    // Fallback instance
+    supabaseInstance = createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY);
+    return supabaseInstance;
   }
 }
 
@@ -51,35 +52,29 @@ export function initSupabase(url?: string, anonKey?: string): SupabaseClient | n
 initSupabase();
 
 export function setSupabaseCredentials(url: string, anonKey: string): boolean {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_URL_KEY, url.trim());
-    localStorage.setItem(STORAGE_ANON_KEY, anonKey.trim());
-  }
   const client = initSupabase(url, anonKey);
   return Boolean(client);
 }
 
-export const getSupabase = (): SupabaseClient | null => {
+export const getSupabase = (): SupabaseClient => {
   if (!supabaseInstance) {
-    initSupabase();
+    return initSupabase();
   }
   return supabaseInstance;
 };
 
 export const isSupabaseConfigured = (): boolean => {
-  const key = getSavedSupabaseAnonKey();
-  return Boolean(key && key.length > 20);
+  return true;
 };
 
 export const supabase = {
-  get client(): SupabaseClient | null {
+  get client(): SupabaseClient {
     return getSupabase();
   },
   from(table: string) {
-    const client = getSupabase();
-    if (!client) {
-      throw new Error('Supabase client belum terhubung. Harap masukkan Supabase Anon Key di Pengaturan Database.');
-    }
-    return client.from(table);
+    return getSupabase().from(table);
+  },
+  channel(name: string) {
+    return getSupabase().channel(name);
   },
 };

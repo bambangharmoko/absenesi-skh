@@ -41,7 +41,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 6000); // 6s auto refresh
-    return () => clearInterval(interval);
+
+    const handleDbUpdate = () => {
+      fetchData();
+    };
+    window.addEventListener('skh_db_updated', handleDbUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('skh_db_updated', handleDbUpdate);
+    };
   }, [fetchData]);
 
   const handleOpenOverride = (studentId: string, currentStatus?: string) => {
