@@ -253,6 +253,32 @@ export const api = {
     };
   },
 
+  async updateStudent(
+    studentId: string,
+    data: {
+      nis?: string;
+      full_name?: string;
+      nickname?: string;
+      class_name?: string;
+      category?: string;
+      is_active?: boolean;
+    }
+  ): Promise<Student> {
+    const res = await db.updateStudent(studentId, data);
+    return {
+      id: res.id,
+      nis: res.nis,
+      full_name: res.full_name,
+      nickname: res.nickname,
+      class_name: res.class_name,
+      category: res.category,
+      is_active: res.is_active,
+      created_at: res.created_at,
+      photo_count: res.photo_count,
+      latest_photo: res.latest_photo,
+    };
+  },
+
   async deleteStudent(studentId: string): Promise<{ status: string; message: string }> {
     await db.deleteStudent(studentId);
     return {
@@ -281,25 +307,32 @@ export const api = {
     };
   },
 
-
-  async manualOverride(data: { student_id: string; status: string; notes?: string; date?: string; mode?: 'IN' | 'OUT' | 'AUTO' }): Promise<AttendanceRecord> {
+  async manualOverride(data: {
+    student_id: string;
+    status: string;
+    notes?: string;
+    date?: string;
+    mode?: 'IN' | 'OUT' | 'AUTO';
+  }): Promise<AttendanceRecord> {
     const student = db.getStudentById(data.student_id);
     if (!student) throw new Error('Siswa tidak ditemukan');
 
-    const result = await db.recordAttendance(
-      {
-        id: student.id,
-        nis: student.nis,
-        full_name: student.full_name,
-        nickname: student.nickname,
-        class_name: student.class_name,
-        category: student.category,
-      },
-      1.0,
-      null,
-      data.mode || 'AUTO'
-    );
-    return result.record!;
+    const todayStr = data.date || new Date().toISOString().split('T')[0];
+    const existing = db.getAttendances(todayStr).find(a => a.student_id === data.student_id);
+
+    if (existing) {
+      return await db.updateAttendance(existing.id, {
+        status: data.status as AttendanceRecord['status'],
+        notes: data.notes || `Diubah manual oleh guru: ${data.status}`,
+      });
+    }
+
+    return await db.createManualAttendance({
+      student,
+      date: todayStr,
+      status: data.status as AttendanceRecord['status'],
+      notes: data.notes || `Presensi manual oleh guru: ${data.status}`,
+    });
   },
 
   async deleteAttendance(attendanceId: string): Promise<{ status: string; message: string }> {

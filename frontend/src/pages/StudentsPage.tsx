@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Search, Trash2, Camera, UserCheck, ShieldAlert, Award } from 'lucide-react';
+import { Users, Plus, Search, Trash2, Camera, UserCheck, Edit3, X, Check, AlertCircle } from 'lucide-react';
 import { api, Student } from '../services/api';
+import { db } from '../services/db';
 
 interface StudentsPageProps {
   onNavigate: (page: 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports') => void;
@@ -13,9 +14,20 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Edit Student Modal States
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    nis: '',
+    full_name: '',
+    nickname: '',
+    class_name: '',
+    category: '',
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const fetchStudents = async () => {
     try {
-      setIsLoading(true);
       const data = await api.getStudents(selectedClass, searchTerm);
       setStudents(data);
     } catch (err) {
@@ -28,12 +40,21 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
   useEffect(() => {
     fetchStudents();
 
+    // Event listener saat ada perubahan lokal / realtime dari Supabase
     const handleDbUpdate = () => {
       fetchStudents();
     };
-
     window.addEventListener('skh_db_updated', handleDbUpdate);
+
+    // Heartbeat auto-sync setiap 4 detik: memastikan jika ada data dihapus/diubah di laptop,
+    // tampilan di HP otomatis ter-update seketika tanpa perlu refresh manual
+    const interval = setInterval(async () => {
+      await db.syncFromSupabase();
+      fetchStudents();
+    }, 4000);
+
     return () => {
+      clearInterval(interval);
       window.removeEventListener('skh_db_updated', handleDbUpdate);
     };
   }, [selectedClass, searchTerm]);
@@ -45,6 +66,36 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
       fetchStudents();
     } catch (err: unknown) {
       alert((err as Error).message || 'Gagal menghapus siswa');
+    }
+  };
+
+  const handleOpenEdit = (student: Student) => {
+    setEditingStudent(student);
+    setEditFormData({
+      nis: student.nis,
+      full_name: student.full_name,
+      nickname: student.nickname,
+      class_name: student.class_name,
+      category: student.category || 'Umum',
+    });
+    setEditError(null);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+
+    setIsSavingEdit(true);
+    setEditError(null);
+
+    try {
+      await api.updateStudent(editingStudent.id, editFormData);
+      setEditingStudent(null);
+      fetchStudents();
+    } catch (err: unknown) {
+      setEditError((err as Error).message || 'Gagal menyimpan perubahan profil siswa.');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -66,7 +117,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
           className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition"
         >
           <Plus className="w-4 h-4" />
-          <span>Daftar Siswa Baru (5 Pose Wajah)</span>
+          <span>Daftar Siswa Baru (Pose Wajah AI)</span>
         </button>
       </div>
 
@@ -103,7 +154,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
           <Users className="w-12 h-12 mx-auto mb-3 text-slate-500 opacity-50" />
           <p className="text-base font-semibold text-slate-300">Belum ada siswa terdaftar</p>
           <p className="text-xs text-slate-500 mt-1">
-            Klik tombol "Daftar Siswa Baru" untuk mendaftarkan siswa dengan 5 sampel foto wajah.
+            Klik tombol "Daftar Siswa Baru" untuk mendaftarkan siswa dengan pemindaian wajah.
           </p>
         </div>
       ) : (
@@ -140,13 +191,23 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setDeleteConfirmId(student.id)}
-                    className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
-                    title="Hapus Siswa"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {/* Actions: Edit & Delete */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEdit(student)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition"
+                      title="Ubah Data Siswa"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmId(student.id)}
+                      className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                      title="Hapus Siswa"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 py-3 border-y border-slate-800/80 text-xs">
@@ -181,10 +242,10 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
 
               {/* Delete Modal Confirmation */}
               {deleteConfirmId === student.id && (
-                <div className="mt-4 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200">
+                <div className="mt-4 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200 animate-fadeIn">
                   <div className="font-bold mb-1">Konfirmasi Hapus Siswa?</div>
                   <p className="text-[11px] text-rose-300/80 mb-3">
-                    Seluruh riwayat presensi dan data vektor wajah siswa ini akan dihapus permanen.
+                    Seluruh riwayat presensi dan data vektor wajah siswa ini akan dihapus permanen dari Supabase Cloud.
                   </p>
                   <div className="flex justify-end gap-2">
                     <button
@@ -204,6 +265,130 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-slate-100">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Ubah Data Siswa</h3>
+                  <p className="text-xs text-slate-400">Perubahan akan langsung tersimpan di Supabase Cloud</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingStudent(null)}
+                className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Nomor Induk Siswa (NIS) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.nis}
+                  onChange={e => setEditFormData({ ...editFormData, nis: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Nama Lengkap <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.full_name}
+                    onChange={e => setEditFormData({ ...editFormData, full_name: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Nama Panggilan <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.nickname}
+                    onChange={e => setEditFormData({ ...editFormData, nickname: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Kelas SKH
+                  </label>
+                  <select
+                    value={editFormData.class_name}
+                    onChange={e => setEditFormData({ ...editFormData, class_name: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                  >
+                    <option value="Kelas 1 Autis">Kelas 1 Autis</option>
+                    <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
+                    <option value="Kelas 3 Tunagrahita">Kelas 3 Tunagrahita</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Kategori Kebutuhan Khusus
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.category}
+                    onChange={e => setEditFormData({ ...editFormData, category: e.target.value })}
+                    placeholder="Contoh: Autis, Tunarungu, Umum"
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
