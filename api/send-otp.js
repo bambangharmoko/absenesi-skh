@@ -98,8 +98,10 @@ export default async function handler(req, res) {
       </html>
     `;
 
-    // 1. Cobalah kirim via Resend API jika RESEND_API_KEY tersedia di Environment Variables
-    const resendApiKey = process.env.RESEND_API_KEY;
+    // 1. Cobalah kirim via Resend API jika RESEND_API_KEY atau VITE_RESEND_API_KEY tersedia
+    const rawResendKey = process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY;
+    const resendApiKey = rawResendKey ? rawResendKey.trim().replace(/^["']|["']$/g, '') : '';
+
     if (resendApiKey) {
       console.log(`[API /send-otp] Mengirim email via Resend API ke ${targetEmail}...`);
       const resendRes = await fetch('https://api.resend.com/emails', {
@@ -116,8 +118,8 @@ export default async function handler(req, res) {
         }),
       });
 
-      const resendData = await resendRes.json();
-      if (resendRes.ok) {
+      const resendData = await resendRes.json().catch(() => ({}));
+      if (resendRes.ok && resendData?.id) {
         console.log(`[API /send-otp] ✅ Email berhasil dikirim via Resend! ID:`, resendData.id);
         return res.status(200).json({
           success: true,
@@ -126,11 +128,12 @@ export default async function handler(req, res) {
           message: `Kode OTP 6-digit telah berhasil dikirim ke ${targetEmail}. Silakan periksa Kotak Masuk Gmail Anda.`,
         });
       } else {
-        console.error('[API /send-otp] Gagal kirim via Resend:', resendData);
-        return res.status(500).json({
+        console.error('[API /send-otp] Resend API error response:', resendData);
+        const detailError = resendData?.message || resendData?.error || `Resend HTTP error ${resendRes.status}`;
+        return res.status(resendRes.status || 500).json({
           success: false,
           provider: 'resend',
-          error: resendData.message || 'Gagal mengirim email via Resend.',
+          error: `Gagal mengirim email via Resend: ${detailError}`,
         });
       }
     }
