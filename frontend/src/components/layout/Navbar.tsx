@@ -43,17 +43,17 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
   const { currentUser, isAuthenticated, role, logout, openLoginModal, openProfileModal } = useAuth();
 
   const [timeStr, setTimeStr] = useState<string>('');
-  const [dateStr, setDateStr] = useState<string>('');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const desktopDropdownRef = useRef<HTMLDivElement>(null);
+  const mobileDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      setDateStr(now.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }));
     };
 
     updateTime();
@@ -73,10 +73,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (checks both desktop and mobile containers)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inDesktop = desktopDropdownRef.current && desktopDropdownRef.current.contains(target);
+      const inMobile = mobileDropdownRef.current && mobileDropdownRef.current.contains(target);
+      if (!inDesktop && !inMobile) {
         setIsDropdownOpen(false);
       }
     };
@@ -140,6 +143,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     item => currentPage === item.id || (item.id === 'students' && currentPage === 'register')
   );
 
+  const mobileGridColsClass =
+    !isAuthenticated || primaryNav.length <= 2
+      ? 'grid-cols-2'
+      : role === 'GURU'
+      ? 'grid-cols-3'
+      : 'grid-cols-4';
+
   const renderNavButton = (item: NavItem, compact = false) => {
     const Icon = item.icon;
     const isActive =
@@ -151,11 +161,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
           onNavigate(item.id);
           setIsDropdownOpen(false);
         }}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer select-none ${
           isActive
             ? compact
               ? 'bg-slate-800 text-white'
-              : 'bg-slate-800 text-white shadow-xs'
+              : 'bg-slate-800 text-white shadow-sm'
             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
         }`}
       >
@@ -193,18 +203,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
               </div>
             </div>
 
-            {/* Center Segmented Navigation Control */}
+            {/* Center Segmented Navigation Control (Desktop) */}
             <nav className="hidden md:flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
               {primaryNav.map(item => renderNavButton(item))}
 
               {/* Pengelolaan Dropdown for Kepala Sekolah */}
               {secondaryNav.length > 0 && (
-                <div ref={dropdownRef} className="relative">
+                <div ref={desktopDropdownRef} className="relative">
                   <button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer select-none ${
                       isSecondaryActive
-                        ? 'bg-slate-800 text-white shadow-xs'
+                        ? 'bg-slate-800 text-white shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                     }`}
                   >
@@ -225,9 +235,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                               onNavigate(item.id);
                               setIsDropdownOpen(false);
                             }}
-                            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium transition ${
+                            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium transition cursor-pointer ${
                               isActive
-                                ? 'bg-slate-800/80 text-white'
+                                ? 'bg-slate-800/80 text-white font-semibold'
                                 : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/80'
                             }`}
                           >
@@ -254,7 +264,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
               {isInstallable && (
                 <button
                   onClick={handleInstallClick}
-                  className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition"
+                  className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Install PWA</span>
@@ -265,7 +275,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
               {!isAuthenticated ? (
                 <button
                   onClick={openLoginModal}
-                  className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
+                  className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Login Petugas</span>
@@ -275,14 +285,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                   <div
                     onClick={openProfileModal}
                     title="Klik untuk buka Pengaturan Profil & Wali Kelas"
-                    className="hidden sm:flex flex-col text-right cursor-pointer group"
+                    className="hidden sm:flex flex-col text-right cursor-pointer group select-none"
                   >
                     <div className="flex items-center justify-end gap-1.5">
                       <span className="text-xs font-semibold text-slate-100 max-w-[130px] truncate group-hover:text-blue-400 transition">
                         {currentUser?.full_name}
                       </span>
                       <span
-                        className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                           role === 'KEPALA_SEKOLAH'
                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                             : role === 'ADMIN'
@@ -302,7 +312,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                   <button
                     onClick={openProfileModal}
                     title="Pengaturan Profil & Wali Kelas"
-                    className="p-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition"
+                    className="p-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition cursor-pointer"
                   >
                     <Settings className="w-3.5 h-3.5" />
                   </button>
@@ -313,7 +323,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                       onNavigate('dashboard');
                     }}
                     title="Keluar dari sistem"
-                    className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-800/50 text-slate-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 transition"
+                    className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-800/50 text-slate-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Keluar</span>
@@ -324,20 +334,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
           </div>
         </div>
 
-
-        {/* Mobile Bottom Navigation Bar */}
+        {/* Mobile Navigation Bar */}
         <div
-          className={`md:hidden grid ${
-            allNavItems.length <= 2
-              ? 'grid-cols-2'
-              : allNavItems.length === 3
-              ? 'grid-cols-3'
-              : allNavItems.length <= 5
-              ? `grid-cols-${allNavItems.length}`
-              : 'grid-cols-4'
-          } bg-[#0d1322] border-t border-slate-800 py-1.5 px-2 gap-0.5`}
+          className={`md:hidden grid ${mobileGridColsClass} bg-[#0d1322] border-t border-slate-800 py-1.5 px-2 gap-0.5`}
         >
-          {/* On mobile: show first 3 primary + "Lainnya" if secondary exists */}
+          {/* On mobile: show primary tabs + "Lainnya" if Kepala Sekolah */}
           {role === 'KEPALA_SEKOLAH' ? (
             <>
               {primaryNav.map(item => {
@@ -347,9 +348,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => onNavigate(item.id)}
-                    className={`flex flex-col items-center gap-1 py-1 text-[11px] font-medium transition ${
-                      isActive ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+                    onClick={() => {
+                      onNavigate(item.id);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`flex flex-col items-center gap-1 py-1 text-[11px] font-medium transition cursor-pointer ${
+                      isActive ? 'text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -357,19 +361,21 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                   </button>
                 );
               })}
+
               {/* Mobile dropdown trigger */}
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative" ref={mobileDropdownRef}>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className={`w-full flex flex-col items-center gap-1 py-1 text-[11px] font-medium transition ${
-                    isSecondaryActive ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+                  className={`w-full flex flex-col items-center gap-1 py-1 text-[11px] font-medium transition cursor-pointer ${
+                    isSecondaryActive || isDropdownOpen ? 'text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <FolderCog className="w-4 h-4" />
                   <span>Lainnya</span>
                 </button>
+
                 {isDropdownOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 w-48 bg-[#0e1424] border border-slate-800 rounded-lg shadow-2xl overflow-hidden z-50 animate-fadeIn">
+                  <div className="absolute top-full right-0 mt-1 w-52 bg-[#0e1424] border border-slate-800 rounded-lg shadow-2xl overflow-hidden z-50 animate-fadeIn">
                     {secondaryNav.map(item => {
                       const Icon = item.icon;
                       const isActive = currentPage === item.id;
@@ -380,9 +386,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                             onNavigate(item.id);
                             setIsDropdownOpen(false);
                           }}
-                          className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium transition ${
+                          className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium transition cursor-pointer ${
                             isActive
-                              ? 'bg-slate-800/80 text-white'
+                              ? 'bg-slate-800/80 text-white font-semibold'
                               : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/80'
                           }`}
                         >
@@ -404,8 +410,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                 <button
                   key={item.id}
                   onClick={() => onNavigate(item.id)}
-                  className={`flex flex-col items-center gap-1 py-1 text-[11px] font-medium transition ${
-                    isActive ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+                  className={`flex flex-col items-center gap-1 py-1 text-[11px] font-medium transition cursor-pointer ${
+                    isActive ? 'text-blue-400 font-semibold' : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <Icon className="w-4 h-4" />

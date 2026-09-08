@@ -12,7 +12,7 @@ export const LoginModal: React.FC = () => {
 
   if (!isLoginModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -22,15 +22,19 @@ export const LoginModal: React.FC = () => {
     }
 
     setIsLoading(true);
-    const result = login(username.trim(), password);
-    setIsLoading(false);
-
-    if (!result.success) {
-      setErrorMsg(result.error || 'Gagal masuk sistem.');
-    } else {
-      // Clear inputs
-      setUsername('');
-      setPassword('');
+    try {
+      const result = await login(username.trim(), password);
+      if (!result.success) {
+        setErrorMsg(result.error || 'Gagal masuk sistem.');
+      } else {
+        // Clear inputs
+        setUsername('');
+        setPassword('');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Terjadi kesalahan saat memproses login.');
+    } finally {
+      setIsLoading(false);
     }
   };
 

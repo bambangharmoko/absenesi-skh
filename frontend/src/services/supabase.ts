@@ -77,8 +77,8 @@ export const supabase = {
   from(table: string) {
     return getSupabase().from(table);
   },
-  channel(name: string) {
-    return getSupabase().channel(name);
+  channel(name: string, opts?: any) {
+    return getSupabase().channel(name, opts);
   },
 };
 

@@ -423,8 +423,12 @@ export const api = {
     await db.deleteUser(id);
   },
 
-  login(username: string, password: string): { success: boolean; user?: UserAccount; error?: string } {
-    return db.authenticateUser(username, password);
+  async login(username: string, password: string): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    return await db.authenticateUserAsync(username, password);
+  },
+
+  async syncUsers(): Promise<boolean> {
+    return await db.syncUsersFromSupabase();
   },
 
   // KBM Journal Endpoints

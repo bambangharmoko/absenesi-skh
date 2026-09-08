@@ -6,7 +6,7 @@ interface AuthContextType {
   currentUser: UserAccount | null;
   isAuthenticated: boolean;
   role: UserRole | 'GUEST';
-  login: (username: string, password: string) => { success: boolean; error?: string };
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   setCurrentUserDirectly: (user: UserAccount) => void;
   logout: () => void;
   isLoginModalOpen: boolean;
@@ -46,7 +46,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUser = () => {
     if (!currentUser) return;
     const all = api.getUsers();
-    const updated = all.find(u => u.id === currentUser.id);
+    const updated = all.find(
+      u => u.id === currentUser.id || u.username.toLowerCase() === currentUser.username.toLowerCase()
+    );
     if (updated) {
       if (updated.status !== 'APPROVED' || !updated.is_active) {
         // Automatically logout if account is deactivated or no longer approved
@@ -66,8 +68,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('skh_users_updated', handleUsersUpdate);
   }, [currentUser]);
 
-  const login = (username: string, password: string): { success: boolean; error?: string } => {
-    const result = api.login(username, password);
+  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const result = await api.login(username, password);
     if (result.success && result.user) {
       setCurrentUser(result.user);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.user));

@@ -114,6 +114,7 @@ class DatabaseService {
   constructor() {
     this.initDatabase();
     this.syncFromSupabase();
+    this.syncUsersFromSupabase();
     this.setupRealtimeSubscription();
   }
 
@@ -288,8 +289,124 @@ class DatabaseService {
   }
 
   /**
-   * Mengatur langganan Supabase Realtime (PostgreSQL Changes)
-   * Saat ada siswa baru/absen masuk dari perangkat manapun, UI langsung terupdate secara real-time.
+   * Helper untuk membuat UUID v4 standar yang kompatibel dengan tipe UUID Supabase
+   */
+  private generateUUID(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  /**
+   * Broadcast pembaruan akun pengguna ke semua klien yang terhubung via Supabase Realtime
+   */
+  private broadcastUsersUpdated() {
+    try {
+      const ch = supabase.channel('skh_realtime_db', { config: { broadcast: { self: false } } });
+      ch.send({
+        type: 'broadcast',
+        event: 'users_updated',
+        payload: { timestamp: Date.now() },
+      });
+    } catch (err) {
+      console.warn('[Database] Broadcast users_updated failed:', err);
+    }
+  }
+
+  /**
+   * Sinkronisasi data akun pengguna (users) dari Supabase Cloud secara real-time
+   */
+  async syncUsersFromSupabase(): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    try {
+      const { data: usersData, error: uErr } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (uErr) {
+        console.warn('[Database] ⚠️ Supabase fetch users notice:', uErr.message);
+        return false;
+      }
+
+      if (usersData && usersData.length > 0) {
+        const mapped: UserAccount[] = usersData.map(u => {
+          let password = u.hashed_password || '';
+          let status: UserStatus = 'APPROVED';
+          let nuptk = '';
+          let email: string | undefined = undefined;
+          let wali_kelas = '';
+
+          if (typeof u.hashed_password === 'string' && u.hashed_password.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(u.hashed_password);
+              password = parsed.password || password;
+              status = parsed.status || status;
+              nuptk = parsed.nuptk || nuptk;
+              email = parsed.email || undefined;
+              wali_kelas = parsed.wali_kelas || wali_kelas;
+            } catch {}
+          }
+
+          return {
+            id: u.id,
+            username: u.username,
+            password,
+            full_name: u.full_name || '',
+            nuptk: nuptk,
+            role: (u.role as UserRole) || 'GURU',
+            status,
+            email,
+            wali_kelas: wali_kelas || undefined,
+            is_active: u.is_active ?? true,
+            created_at: u.created_at || new Date().toISOString(),
+          };
+        });
+
+        localStorage.setItem(this.usersKey, JSON.stringify(mapped));
+        return true;
+      } else if (usersData && usersData.length === 0) {
+        // Jika di Supabase masih kosong, unggah akun lokal jika ada (misal pendaftaran awal)
+        const localUsers = this.getUsers();
+        if (localUsers.length > 0) {
+          for (const lu of localUsers) {
+            const cleanId = lu.id && lu.id.includes('-') && lu.id.length >= 32 ? lu.id : this.generateUUID();
+            lu.id = cleanId;
+            const meta = {
+              password: lu.password,
+              status: lu.status,
+              nuptk: lu.nuptk,
+              email: lu.email,
+              wali_kelas: lu.wali_kelas,
+            };
+            await supabase.from('users').upsert({
+              id: cleanId,
+              username: lu.username,
+              hashed_password: JSON.stringify(meta),
+              full_name: lu.full_name,
+              role: lu.role,
+              is_active: lu.is_active,
+              created_at: lu.created_at || new Date().toISOString(),
+            });
+          }
+          localStorage.setItem(this.usersKey, JSON.stringify(localUsers));
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('[Database] Sync users exception:', e);
+    }
+    return false;
+  }
+
+  /**
+   * Mengatur langganan Supabase Realtime (PostgreSQL Changes & Broadcast)
+   * Saat ada siswa baru/absen/user baru dari perangkat manapun, UI langsung terupdate secara real-time.
    */
   private setupRealtimeSubscription() {
     if (this.isSubscribedToRealtime || typeof window === 'undefined') return;
@@ -325,6 +442,24 @@ class DatabaseService {
             window.dispatchEvent(new CustomEvent('skh_db_updated'));
           }
         )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'users' },
+          async (payload) => {
+            console.log('[Supabase Realtime] Perubahan tabel users terdeteksi:', payload.eventType);
+            await this.syncUsersFromSupabase();
+            window.dispatchEvent(new CustomEvent('skh_users_updated'));
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'users_updated' },
+          async () => {
+            console.log('[Supabase Realtime] Broadcast users_updated diterima');
+            await this.syncUsersFromSupabase();
+            window.dispatchEvent(new CustomEvent('skh_users_updated'));
+          }
+        )
         .subscribe((status) => {
           console.log('[Supabase Realtime] Status channel realtime:', status);
         });
@@ -337,6 +472,9 @@ class DatabaseService {
             this.syncFromSupabase().then(() => {
               window.dispatchEvent(new CustomEvent('skh_db_updated'));
             });
+            this.syncUsersFromSupabase().then(() => {
+              window.dispatchEvent(new CustomEvent('skh_users_updated'));
+            });
           }
         });
       }
@@ -346,12 +484,18 @@ class DatabaseService {
           this.syncFromSupabase().then(() => {
             window.dispatchEvent(new CustomEvent('skh_db_updated'));
           });
+          this.syncUsersFromSupabase().then(() => {
+            window.dispatchEvent(new CustomEvent('skh_users_updated'));
+          });
         });
 
         // Polling background setiap 4 detik untuk memastikan semua perangkat (laptop/HP) selalu sinkron realtime
         setInterval(() => {
           this.syncFromSupabase().then(() => {
             window.dispatchEvent(new CustomEvent('skh_db_updated'));
+          });
+          this.syncUsersFromSupabase().then(() => {
+            window.dispatchEvent(new CustomEvent('skh_users_updated'));
           });
         }, 4000);
       }
@@ -1169,9 +1313,10 @@ class DatabaseService {
     }
 
     const isAutoApprovedKepsek = data.role === 'KEPALA_SEKOLAH' && data.is_verified_otp;
+    const cleanId = this.generateUUID();
 
     const newUser: UserAccount = {
-      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      id: cleanId,
       username: cleanUsername,
       password: data.password,
       full_name: data.full_name.trim(),
@@ -1187,9 +1332,40 @@ class DatabaseService {
     users.push(newUser);
     localStorage.setItem(this.usersKey, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    // Sync ke Supabase Cloud secara real-time
+    if (isSupabaseConfigured()) {
+      try {
+        const meta = {
+          password: newUser.password,
+          status: newUser.status,
+          nuptk: newUser.nuptk,
+          email: newUser.email,
+          wali_kelas: newUser.wali_kelas,
+        };
+        const { error: sbErr } = await supabase.from('users').insert({
+          id: newUser.id,
+          username: newUser.username,
+          hashed_password: JSON.stringify(meta),
+          full_name: newUser.full_name,
+          role: newUser.role,
+          is_active: newUser.is_active,
+          created_at: newUser.created_at,
+        });
+
+        if (sbErr) {
+          console.warn('[Database] Supabase user insert notice:', sbErr.message);
+        } else {
+          this.broadcastUsersUpdated();
+          console.log('[Database] ✅ Akun user tersimpan di Supabase Cloud secara real-time:', newUser.username);
+        }
+      } catch (err) {
+        console.warn('[Database] Gagal sinkron user baru ke Supabase:', err);
+      }
+    }
+
     return newUser;
   }
-
 
   async approveUser(id: string): Promise<UserAccount> {
     const users = this.getUsers();
@@ -1200,6 +1376,30 @@ class DatabaseService {
     users[idx].is_active = true;
     localStorage.setItem(this.usersKey, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const u = users[idx];
+        const meta = {
+          password: u.password,
+          status: 'APPROVED',
+          nuptk: u.nuptk,
+          email: u.email,
+          wali_kelas: u.wali_kelas,
+        };
+        await supabase
+          .from('users')
+          .update({
+            is_active: true,
+            hashed_password: JSON.stringify(meta),
+          })
+          .eq('id', id);
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase approveUser update failed:', err);
+      }
+    }
+
     return users[idx];
   }
 
@@ -1211,6 +1411,29 @@ class DatabaseService {
     users[idx].status = 'REJECTED';
     localStorage.setItem(this.usersKey, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const u = users[idx];
+        const meta = {
+          password: u.password,
+          status: 'REJECTED',
+          nuptk: u.nuptk,
+          email: u.email,
+          wali_kelas: u.wali_kelas,
+        };
+        await supabase
+          .from('users')
+          .update({
+            hashed_password: JSON.stringify(meta),
+          })
+          .eq('id', id);
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase rejectUser update failed:', err);
+      }
+    }
+
     return users[idx];
   }
 
@@ -1222,6 +1445,19 @@ class DatabaseService {
     users[idx].is_active = !users[idx].is_active;
     localStorage.setItem(this.usersKey, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('users')
+          .update({ is_active: users[idx].is_active })
+          .eq('id', id);
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase toggleUserActive failed:', err);
+      }
+    }
+
     return users[idx];
   }
 
@@ -1230,6 +1466,15 @@ class DatabaseService {
     users = users.filter(u => u.id !== id);
     localStorage.setItem(this.usersKey, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('users').delete().eq('id', id);
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase deleteUser failed:', err);
+      }
+    }
   }
 
   authenticateUser(username: string, password: string): { success: boolean; user?: UserAccount; error?: string } {
@@ -1262,6 +1507,15 @@ class DatabaseService {
     }
 
     return { success: true, user };
+  }
+
+  async authenticateUserAsync(username: string, password: string): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    const local = this.authenticateUser(username, password);
+    if (local.success) return local;
+
+    // Jika gagal di lokal, coba sinkronisasi cepat dengan Supabase Cloud untuk memastikan akun termutakhir
+    await this.syncUsersFromSupabase();
+    return this.authenticateUser(username, password);
   }
 
   // ==================== JURNAL KBM & ABSENSI KELAS ====================
@@ -1350,6 +1604,30 @@ class DatabaseService {
 
     localStorage.setItem(this.usersKey, JSON.stringify(users));
     window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const u = users[idx];
+        const meta = {
+          password: u.password,
+          status: u.status,
+          nuptk: u.nuptk,
+          email: u.email,
+          wali_kelas: u.wali_kelas,
+        };
+        await supabase
+          .from('users')
+          .update({
+            full_name: u.full_name,
+            hashed_password: JSON.stringify(meta),
+          })
+          .eq('id', userId);
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase updateUserProfile failed:', err);
+      }
+    }
+
     return users[idx];
   }
 
