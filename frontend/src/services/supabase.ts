@@ -71,6 +71,9 @@ export const supabase = {
   get client(): SupabaseClient {
     return getSupabase();
   },
+  get auth() {
+    return getSupabase().auth;
+  },
   from(table: string) {
     return getSupabase().from(table);
   },
@@ -78,3 +81,4 @@ export const supabase = {
     return getSupabase().channel(name);
   },
 };
+

@@ -65,3 +65,53 @@ CREATE POLICY "Allow public read attendances" ON public.attendances FOR SELECT U
 CREATE POLICY "Allow public insert attendances" ON public.attendances FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update attendances" ON public.attendances FOR UPDATE USING (true);
 CREATE POLICY "Allow public delete attendances" ON public.attendances FOR DELETE USING (true);
+
+-- =========================================================================
+-- STRUKTUR KELOLA KELAS & RUANGAN (ROLE: KEPALA SEKOLAH)
+-- =========================================================================
+
+-- 4. Table: class_grades (Tingkat Kelas - Contoh: "Kelas TK A", "Kelas TK B")
+CREATE TABLE IF NOT EXISTS public.class_grades (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Table: rooms (Nama Ruangan - Contoh: "Kelas Cemerlang", "Kelas Ceria")
+CREATE TABLE IF NOT EXISTS public.rooms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. Table: class_rooms (Kombinasi Tingkat Kelas + Ruangan - Contoh: "Kelas TK A - Kelas Cemerlang")
+CREATE TABLE IF NOT EXISTS public.class_rooms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    grade_id UUID NOT NULL REFERENCES public.class_grades(id) ON DELETE CASCADE,
+    room_id UUID NOT NULL REFERENCES public.rooms(id) ON DELETE CASCADE,
+    display_name VARCHAR(255) UNIQUE NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_grade_room UNIQUE (grade_id, room_id)
+);
+
+-- Enable RLS & Policies for Class & Room Tables
+ALTER TABLE public.class_grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_rooms ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read class_grades" ON public.class_grades FOR SELECT USING (true);
+CREATE POLICY "Allow public insert class_grades" ON public.class_grades FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update class_grades" ON public.class_grades FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete class_grades" ON public.class_grades FOR DELETE USING (true);
+
+CREATE POLICY "Allow public read rooms" ON public.rooms FOR SELECT USING (true);
+CREATE POLICY "Allow public insert rooms" ON public.rooms FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update rooms" ON public.rooms FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete rooms" ON public.rooms FOR DELETE USING (true);
+
+CREATE POLICY "Allow public read class_rooms" ON public.class_rooms FOR SELECT USING (true);
+CREATE POLICY "Allow public insert class_rooms" ON public.class_rooms FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update class_rooms" ON public.class_rooms FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete class_rooms" ON public.class_rooms FOR DELETE USING (true);
+

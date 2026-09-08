@@ -7,9 +7,11 @@ import { RegisterStudentPage } from './pages/RegisterStudentPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { KbmJournalPage } from './pages/KbmJournalPage';
 import { UserManagementPage } from './pages/UserManagementPage';
+import { ManageClassesPage } from './pages/ManageClassesPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
+import { ProfileModal } from './components/auth/ProfileModal';
 
 const AppContent: React.FC = () => {
   const { currentUser, isAuthenticated, role, openLoginModal } = useAuth();
@@ -26,12 +28,17 @@ const AppContent: React.FC = () => {
         currentPage === 'students' ||
         currentPage === 'register' ||
         currentPage === 'reports' ||
-        currentPage === 'users'
+        currentPage === 'users' ||
+        currentPage === 'manage-classes'
       ) {
         setCurrentPage('dashboard');
       }
     } else if (role === 'ADMIN') {
-      if (currentPage === 'jurnal-kbm' || currentPage === 'users') {
+      if (
+        currentPage === 'jurnal-kbm' ||
+        currentPage === 'users' ||
+        currentPage === 'manage-classes'
+      ) {
         setCurrentPage('dashboard');
       }
     }
@@ -48,13 +55,23 @@ const AppContent: React.FC = () => {
     }
 
     // Role-specific Route Guard
-    if (role === 'GURU' && (page === 'students' || page === 'register' || page === 'reports' || page === 'users')) {
+    if (
+      role === 'GURU' &&
+      (page === 'students' ||
+        page === 'register' ||
+        page === 'reports' ||
+        page === 'users' ||
+        page === 'manage-classes')
+    ) {
       alert('Halaman ini khusus untuk Role Admin atau Kepala Sekolah.');
       setCurrentPage('dashboard');
       return;
     }
 
-    if (role === 'ADMIN' && (page === 'jurnal-kbm' || page === 'users')) {
+    if (
+      role === 'ADMIN' &&
+      (page === 'jurnal-kbm' || page === 'users' || page === 'manage-classes')
+    ) {
       alert('Halaman ini khusus untuk Role Guru atau Kepala Sekolah.');
       setCurrentPage('dashboard');
       return;
@@ -79,6 +96,9 @@ const AppContent: React.FC = () => {
         {currentPage === 'dashboard' && (
           <DashboardPage onNavigate={handleNavigate} />
         )}
+        {currentPage === 'manage-classes' && role === 'KEPALA_SEKOLAH' && (
+          <ManageClassesPage />
+        )}
         {currentPage === 'students' && (role === 'ADMIN' || role === 'KEPALA_SEKOLAH') && (
           <StudentsPage onNavigate={handleNavigate} />
         )}
@@ -99,9 +119,10 @@ const AppContent: React.FC = () => {
         )}
       </main>
 
-      {/* Authentication Modals */}
+      {/* Authentication & Profile Modals */}
       <LoginModal />
       <RegisterModal />
+      <ProfileModal />
 
       {/* Minimal Enterprise Footer */}
       <footer className="border-t border-slate-800/80 bg-[#090d16] py-3.5 px-6 text-center text-xs text-slate-400">

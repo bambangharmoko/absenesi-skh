@@ -6,17 +6,24 @@ import {
   FileSpreadsheet,
   Download,
   Clock,
-  Cloud,
-  CheckCircle2,
   BookOpen,
   ShieldCheck,
   LogIn,
   LogOut,
-  User,
+  Layers,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export type AppPage = 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports' | 'jurnal-kbm' | 'users';
+export type AppPage =
+  | 'kiosk'
+  | 'dashboard'
+  | 'students'
+  | 'register'
+  | 'reports'
+  | 'jurnal-kbm'
+  | 'users'
+  | 'manage-classes';
 
 interface NavbarProps {
   currentPage: AppPage;
@@ -25,7 +32,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
-  const { currentUser, isAuthenticated, role, logout, openLoginModal } = useAuth();
+  const { currentUser, isAuthenticated, role, logout, openLoginModal, openProfileModal } = useAuth();
 
   const [timeStr, setTimeStr] = useState<string>('');
   const [dateStr, setDateStr] = useState<string>('');
@@ -95,6 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     navItems = [
       { id: 'kiosk', label: 'Kiosk Absen', icon: Camera },
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'manage-classes', label: 'Kelola Kelas', icon: Layers },
       { id: 'students', label: 'Data Siswa', icon: Users },
       { id: 'reports', label: 'Laporan Excel', icon: FileSpreadsheet },
       { id: 'jurnal-kbm', label: 'Jurnal KBM', icon: BookOpen },
@@ -183,9 +191,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <div className="hidden sm:flex flex-col text-right">
+                  <div
+                    onClick={openProfileModal}
+                    title="Klik untuk buka Pengaturan Profil & Wali Kelas"
+                    className="hidden sm:flex flex-col text-right cursor-pointer group"
+                  >
                     <div className="flex items-center justify-end gap-1.5">
-                      <span className="text-xs font-semibold text-slate-100 max-w-[130px] truncate">
+                      <span className="text-xs font-semibold text-slate-100 max-w-[130px] truncate group-hover:text-blue-400 transition">
                         {currentUser?.full_name}
                       </span>
                       <span
@@ -200,8 +212,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                         {role === 'KEPALA_SEKOLAH' ? 'Kepsek' : role}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono">@{currentUser?.username}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {currentUser?.wali_kelas ? currentUser.wali_kelas : `@${currentUser?.username}`}
+                    </span>
                   </div>
+
+                  {/* Profile Settings Button */}
+                  <button
+                    onClick={openProfileModal}
+                    title="Pengaturan Profil & Wali Kelas"
+                    className="p-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
 
                   <button
                     onClick={() => {
@@ -219,6 +242,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
             </div>
           </div>
         </div>
+
 
         {/* Mobile Bottom Navigation Bar */}
         <div

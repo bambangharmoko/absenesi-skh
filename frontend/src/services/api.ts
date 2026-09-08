@@ -7,10 +7,22 @@ import {
   UserAccount,
   KbmAttendanceItem,
   KbmJournalRecord,
+  ClassGrade,
+  RoomItem,
+  ClassRoomCombination,
 } from './db';
 import { faceApi } from './faceApi';
 
-export type { UserRole, UserStatus, UserAccount, KbmAttendanceItem, KbmJournalRecord };
+export type {
+  UserRole,
+  UserStatus,
+  UserAccount,
+  KbmAttendanceItem,
+  KbmJournalRecord,
+  ClassGrade,
+  RoomItem,
+  ClassRoomCombination,
+};
 
 export interface Student {
   id: string;
@@ -376,9 +388,23 @@ export const api = {
     full_name: string;
     nuptk: string;
     role: UserRole;
+    email?: string;
     wali_kelas?: string;
+    is_verified_otp?: boolean;
   }): Promise<UserAccount> {
     return await db.registerUser(data);
+  },
+
+  async updateUserProfile(
+    userId: string,
+    data: {
+      full_name?: string;
+      nuptk?: string;
+      wali_kelas?: string;
+      password?: string;
+    }
+  ): Promise<UserAccount> {
+    return await db.updateUserProfile(userId, data);
   },
 
   async approveUser(id: string): Promise<UserAccount> {
@@ -413,5 +439,47 @@ export const api = {
   async deleteKbmJournal(id: string): Promise<void> {
     await db.deleteKbmJournal(id);
   },
+
+  // Kelola Kelas & Ruangan Endpoints
+  getClassGrades(): ClassGrade[] {
+    return db.getClassGrades();
+  },
+
+  async addClassGrade(name: string): Promise<ClassGrade> {
+    return await db.addClassGrade(name);
+  },
+
+  async deleteClassGrade(id: string): Promise<void> {
+    await db.deleteClassGrade(id);
+  },
+
+  getRooms(): RoomItem[] {
+    return db.getRooms();
+  },
+
+  async addRoom(name: string): Promise<RoomItem> {
+    return await db.addRoom(name);
+  },
+
+  async deleteRoom(id: string): Promise<void> {
+    await db.deleteRoom(id);
+  },
+
+  getClassRooms(activeOnly?: boolean): ClassRoomCombination[] {
+    return db.getClassRooms(activeOnly);
+  },
+
+  async addClassRoom(gradeId: string, roomId: string): Promise<ClassRoomCombination> {
+    return await db.addClassRoom(gradeId, roomId);
+  },
+
+  async toggleClassRoomActive(id: string): Promise<ClassRoomCombination> {
+    return await db.toggleClassRoomActive(id);
+  },
+
+  async deleteClassRoom(id: string): Promise<void> {
+    await db.deleteClassRoom(id);
+  },
 };
+
 

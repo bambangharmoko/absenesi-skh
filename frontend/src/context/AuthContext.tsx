@@ -6,6 +6,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   role: UserRole | 'GUEST';
   login: (username: string, password: string) => { success: boolean; error?: string };
+  setCurrentUserDirectly: (user: UserAccount) => void;
   logout: () => void;
   isLoginModalOpen: boolean;
   openLoginModal: () => void;
@@ -13,6 +14,9 @@ interface AuthContextType {
   isRegisterModalOpen: boolean;
   openRegisterModal: () => void;
   closeRegisterModal: () => void;
+  isProfileModalOpen: boolean;
+  openProfileModal: () => void;
+  closeProfileModal: () => void;
   refreshUser: () => void;
 }
 
@@ -35,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Sync state if user list updates (e.g. status toggled or approved)
   const refreshUser = () => {
@@ -71,6 +76,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: false, error: result.error || 'Gagal login.' };
   };
 
+  const setCurrentUserDirectly = (user: UserAccount) => {
+    setCurrentUser(user);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    setIsLoginModalOpen(false);
+    setIsRegisterModalOpen(false);
+  };
+
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -81,6 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: !!currentUser,
     role: currentUser ? currentUser.role : 'GUEST',
     login,
+    setCurrentUserDirectly,
     logout,
     isLoginModalOpen,
     openLoginModal: () => setIsLoginModalOpen(true),
@@ -88,8 +101,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isRegisterModalOpen,
     openRegisterModal: () => setIsRegisterModalOpen(true),
     closeRegisterModal: () => setIsRegisterModalOpen(false),
+    isProfileModalOpen,
+    openProfileModal: () => setIsProfileModalOpen(true),
+    closeProfileModal: () => setIsProfileModalOpen(false),
     refreshUser,
   };
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

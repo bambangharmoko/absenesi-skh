@@ -51,7 +51,31 @@ export interface UserAccount {
   nuptk: string;
   role: UserRole;
   status: UserStatus;
+  email?: string;
   wali_kelas?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ClassGrade {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface RoomItem {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface ClassRoomCombination {
+  id: string;
+  grade_id: string;
+  grade_name: string;
+  room_id: string;
+  room_name: string;
+  display_name: string;
   is_active: boolean;
   created_at: string;
 }
@@ -82,6 +106,9 @@ class DatabaseService {
   private attendancesKey = 'skh_attendances_v3';
   private usersKey = 'skh_users_v1';
   private kbmJournalsKey = 'skh_kbm_journals_v1';
+  private classGradesKey = 'skh_class_grades_v1';
+  private roomsKey = 'skh_rooms_v1';
+  private classRoomsKey = 'skh_class_rooms_v1';
   private isSubscribedToRealtime = false;
 
   constructor() {
@@ -138,7 +165,94 @@ class DatabaseService {
 
     // Initialize seed users if not already present
     this.initSeedUsers();
+
+    // Initialize seed classes, rooms, and combinations
+    this.initSeedClasses();
   }
+
+  private initSeedClasses() {
+    // 1. Seed Class Grades if empty
+    const rawGrades = localStorage.getItem(this.classGradesKey);
+    let gradesList: ClassGrade[] = [];
+    if (rawGrades) {
+      try {
+        gradesList = JSON.parse(rawGrades);
+      } catch {}
+    }
+    if (gradesList.length === 0) {
+      const defaultGrades = [
+        'Kelas TK A',
+        'Kelas TK B',
+        'Kelas 1 Autis',
+        'Kelas 2 Tunarungu',
+        'Kelas 3 Tunagrahita',
+      ];
+      gradesList = defaultGrades.map((name, i) => ({
+        id: `grade-${i + 1}`,
+        name,
+        created_at: new Date().toISOString(),
+      }));
+      localStorage.setItem(this.classGradesKey, JSON.stringify(gradesList));
+    }
+
+    // 2. Seed Rooms if empty
+    const rawRooms = localStorage.getItem(this.roomsKey);
+    let roomsList: RoomItem[] = [];
+    if (rawRooms) {
+      try {
+        roomsList = JSON.parse(rawRooms);
+      } catch {}
+    }
+    if (roomsList.length === 0) {
+      const defaultRooms = [
+        'Kelas Cemerlang',
+        'Kelas Ceria',
+        'Ruang Anggrek',
+        'Ruang Melati',
+        'Ruang Dahlia',
+      ];
+      roomsList = defaultRooms.map((name, i) => ({
+        id: `room-${i + 1}`,
+        name,
+        created_at: new Date().toISOString(),
+      }));
+      localStorage.setItem(this.roomsKey, JSON.stringify(roomsList));
+    }
+
+    // 3. Seed Combinations if empty
+    const rawCombinations = localStorage.getItem(this.classRoomsKey);
+    let combinationsList: ClassRoomCombination[] = [];
+    if (rawCombinations) {
+      try {
+        combinationsList = JSON.parse(rawCombinations);
+      } catch {}
+    }
+    if (combinationsList.length === 0) {
+      const defaultPairs = [
+        { gradeName: 'Kelas TK A', roomName: 'Kelas Cemerlang' },
+        { gradeName: 'Kelas TK B', roomName: 'Kelas Ceria' },
+        { gradeName: 'Kelas 1 Autis', roomName: 'Ruang Anggrek' },
+        { gradeName: 'Kelas 2 Tunarungu', roomName: 'Ruang Melati' },
+        { gradeName: 'Kelas 3 Tunagrahita', roomName: 'Ruang Dahlia' },
+      ];
+      combinationsList = defaultPairs.map((p, idx) => {
+        const grade = gradesList.find(g => g.name === p.gradeName) || gradesList[idx % gradesList.length];
+        const room = roomsList.find(r => r.name === p.roomName) || roomsList[idx % roomsList.length];
+        return {
+          id: `cr-${idx + 1}`,
+          grade_id: grade.id,
+          grade_name: grade.name,
+          room_id: room.id,
+          room_name: room.name,
+          display_name: `${grade.name} - ${room.name}`,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        };
+      });
+      localStorage.setItem(this.classRoomsKey, JSON.stringify(combinationsList));
+    }
+  }
+
 
   private initSeedUsers() {
     const rawUsers = localStorage.getItem(this.usersKey);
@@ -1090,7 +1204,9 @@ class DatabaseService {
     full_name: string;
     nuptk: string;
     role: UserRole;
+    email?: string;
     wali_kelas?: string;
+    is_verified_otp?: boolean;
   }): Promise<UserAccount> {
     const users = this.getUsers();
     const cleanUsername = data.username.trim();
@@ -1105,6 +1221,8 @@ class DatabaseService {
       throw new Error(`Username "${cleanUsername}" sudah digunakan. Silakan gunakan username lain.`);
     }
 
+    const isAutoApprovedKepsek = data.role === 'KEPALA_SEKOLAH' && data.is_verified_otp;
+
     const newUser: UserAccount = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       username: cleanUsername,
@@ -1112,7 +1230,8 @@ class DatabaseService {
       full_name: data.full_name.trim(),
       nuptk: data.nuptk.trim(),
       role: data.role,
-      status: 'PENDING',
+      email: data.email ? data.email.trim() : undefined,
+      status: isAutoApprovedKepsek ? 'APPROVED' : 'PENDING',
       wali_kelas: data.wali_kelas || '',
       is_active: true,
       created_at: new Date().toISOString(),
@@ -1123,6 +1242,7 @@ class DatabaseService {
     window.dispatchEvent(new CustomEvent('skh_users_updated'));
     return newUser;
   }
+
 
   async approveUser(id: string): Promise<UserAccount> {
     const users = this.getUsers();
@@ -1261,6 +1381,277 @@ class DatabaseService {
     localStorage.setItem(this.kbmJournalsKey, JSON.stringify(journals));
     window.dispatchEvent(new CustomEvent('skh_kbm_updated'));
   }
+
+  // ==================== USER PROFILE & WALI KELAS ====================
+  async updateUserProfile(
+    userId: string,
+    data: {
+      full_name?: string;
+      nuptk?: string;
+      wali_kelas?: string;
+      password?: string;
+    }
+  ): Promise<UserAccount> {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+
+    if (data.full_name) users[idx].full_name = data.full_name.trim();
+    if (data.nuptk) users[idx].nuptk = data.nuptk.trim();
+    if (data.wali_kelas !== undefined) users[idx].wali_kelas = data.wali_kelas.trim();
+    if (data.password) users[idx].password = data.password;
+
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+    return users[idx];
+  }
+
+  // ==================== KELOLA KELAS & RUANGAN ====================
+  getClassGrades(): ClassGrade[] {
+    const raw = localStorage.getItem(this.classGradesKey);
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+
+  async addClassGrade(name: string): Promise<ClassGrade> {
+    const cleanName = name.trim();
+    if (!cleanName) throw new Error('Nama Tingkat Kelas tidak boleh kosong.');
+
+    const grades = this.getClassGrades();
+    const duplicate = grades.find(g => g.name.toLowerCase() === cleanName.toLowerCase());
+    if (duplicate) {
+      throw new Error(`Tingkat Kelas "${cleanName}" sudah ada dalam sistem.`);
+    }
+
+    const newGrade: ClassGrade = {
+      id: `grade-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: cleanName,
+      created_at: new Date().toISOString(),
+    };
+
+    grades.push(newGrade);
+    localStorage.setItem(this.classGradesKey, JSON.stringify(grades));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_grades').insert({
+          id: newGrade.id,
+          name: newGrade.name,
+        });
+      } catch (e) {
+        console.warn('[Database] Supabase insert grade notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+    return newGrade;
+  }
+
+  async deleteClassGrade(id: string): Promise<void> {
+    const combinations = this.getClassRooms();
+    const isUsed = combinations.some(c => c.grade_id === id);
+    if (isUsed) {
+      throw new Error('Tingkat Kelas ini sedang digunakan dalam kombinasi Ruangan. Hapus kombinasi terkait terlebih dahulu.');
+    }
+
+    let grades = this.getClassGrades();
+    grades = grades.filter(g => g.id !== id);
+    localStorage.setItem(this.classGradesKey, JSON.stringify(grades));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_grades').delete().eq('id', id);
+      } catch (e) {
+        console.warn('[Database] Supabase delete grade notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+  }
+
+  getRooms(): RoomItem[] {
+    const raw = localStorage.getItem(this.roomsKey);
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+
+  async addRoom(name: string): Promise<RoomItem> {
+    const cleanName = name.trim();
+    if (!cleanName) throw new Error('Nama Ruangan tidak boleh kosong.');
+
+    const rooms = this.getRooms();
+    const duplicate = rooms.find(r => r.name.toLowerCase() === cleanName.toLowerCase());
+    if (duplicate) {
+      throw new Error(`Nama Ruangan "${cleanName}" sudah ada dalam sistem.`);
+    }
+
+    const newRoom: RoomItem = {
+      id: `room-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: cleanName,
+      created_at: new Date().toISOString(),
+    };
+
+    rooms.push(newRoom);
+    localStorage.setItem(this.roomsKey, JSON.stringify(rooms));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('rooms').insert({
+          id: newRoom.id,
+          name: newRoom.name,
+        });
+      } catch (e) {
+        console.warn('[Database] Supabase insert room notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+    return newRoom;
+  }
+
+  async deleteRoom(id: string): Promise<void> {
+    const combinations = this.getClassRooms();
+    const isUsed = combinations.some(c => c.room_id === id);
+    if (isUsed) {
+      throw new Error('Nama Ruangan ini sedang digunakan dalam kombinasi Kelas. Hapus kombinasi terkait terlebih dahulu.');
+    }
+
+    let rooms = this.getRooms();
+    rooms = rooms.filter(r => r.id !== id);
+    localStorage.setItem(this.roomsKey, JSON.stringify(rooms));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('rooms').delete().eq('id', id);
+      } catch (e) {
+        console.warn('[Database] Supabase delete room notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+  }
+
+  getClassRooms(activeOnly: boolean = false): ClassRoomCombination[] {
+    const raw = localStorage.getItem(this.classRoomsKey);
+    let list: ClassRoomCombination[] = [];
+    if (raw) {
+      try {
+        list = JSON.parse(raw);
+      } catch {
+        list = [];
+      }
+    }
+    if (activeOnly) {
+      list = list.filter(c => c.is_active);
+    }
+    return list;
+  }
+
+  async addClassRoom(gradeId: string, roomId: string): Promise<ClassRoomCombination> {
+    const grades = this.getClassGrades();
+    const rooms = this.getRooms();
+
+    const grade = grades.find(g => g.id === gradeId);
+    if (!grade) throw new Error('Tingkat Kelas tidak valid.');
+
+    const room = rooms.find(r => r.id === roomId);
+    if (!room) throw new Error('Nama Ruangan tidak valid.');
+
+    const combinations = this.getClassRooms();
+    const displayName = `${grade.name} - ${room.name}`;
+
+    // Strict validation: Pair must be unique
+    const pairExists = combinations.find(
+      c => c.grade_id === gradeId && c.room_id === roomId
+    );
+    if (pairExists) {
+      throw new Error(`Kombinasi "${displayName}" sudah pernah didaftarkan.`);
+    }
+
+    // Display name unique check
+    const nameExists = combinations.find(
+      c => c.display_name.toLowerCase() === displayName.toLowerCase()
+    );
+    if (nameExists) {
+      throw new Error(`Kombinasi dengan nama "${displayName}" sudah ada.`);
+    }
+
+    const newCombination: ClassRoomCombination = {
+      id: `cr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      grade_id: grade.id,
+      grade_name: grade.name,
+      room_id: room.id,
+      room_name: room.name,
+      display_name: displayName,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+
+    combinations.push(newCombination);
+    localStorage.setItem(this.classRoomsKey, JSON.stringify(combinations));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_rooms').insert({
+          id: newCombination.id,
+          grade_id: newCombination.grade_id,
+          room_id: newCombination.room_id,
+          display_name: newCombination.display_name,
+          is_active: true,
+        });
+      } catch (e) {
+        console.warn('[Database] Supabase insert class_room notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+    return newCombination;
+  }
+
+  async toggleClassRoomActive(id: string): Promise<ClassRoomCombination> {
+    const list = this.getClassRooms();
+    const idx = list.findIndex(c => c.id === id);
+    if (idx === -1) throw new Error('Kombinasi kelas tidak ditemukan.');
+
+    list[idx].is_active = !list[idx].is_active;
+    localStorage.setItem(this.classRoomsKey, JSON.stringify(list));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_rooms').update({ is_active: list[idx].is_active }).eq('id', id);
+      } catch (e) {
+        console.warn('[Database] Supabase update class_room notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+    return list[idx];
+  }
+
+  async deleteClassRoom(id: string): Promise<void> {
+    let list = this.getClassRooms();
+    list = list.filter(c => c.id !== id);
+    localStorage.setItem(this.classRoomsKey, JSON.stringify(list));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('class_rooms').delete().eq('id', id);
+      } catch (e) {
+        console.warn('[Database] Supabase delete class_room notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+  }
 }
+
 
 export const db = new DatabaseService();
