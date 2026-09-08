@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api, UserAccount, UserRole } from '../services/api';
+import { supabase } from '../services/supabase';
 
 interface AuthContextType {
   currentUser: UserAccount | null;
@@ -86,6 +87,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    // Terminate Supabase Auth session
+    supabase.auth.signOut().catch(() => {});
   };
 
   const value: AuthContextType = {
