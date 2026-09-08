@@ -1,6 +1,7 @@
 {
   "name": "absensi-skh",
   "version": "2.0.0",
+  "type": "module",
   "description": "Sistem Presensi Siswa Face Recognition Real-time SKH Santo Fransiskus Asisi (100% Full-Stack TypeScript + Supabase)",
   "scripts": {
     "dev": "npm --prefix frontend run dev",

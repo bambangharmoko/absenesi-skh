@@ -163,11 +163,11 @@ class DatabaseService {
     // PURGE ORPHAN ATTENDANCE RECORDS (belonging to non-existent students)
     this.purgeOrphanAttendances();
 
-    // Initialize seed users if not already present
-    this.initSeedUsers();
-
     // Initialize seed classes, rooms, and combinations
     this.initSeedClasses();
+
+    // Purge any demo accounts to ensure clean production database
+    this.purgeDemoUsers();
   }
 
   private initSeedClasses() {
@@ -253,73 +253,20 @@ class DatabaseService {
     }
   }
 
-
-  private initSeedUsers() {
+  private purgeDemoUsers() {
     const rawUsers = localStorage.getItem(this.usersKey);
-    let usersList: UserAccount[] = [];
-    if (rawUsers) {
-      try {
-        usersList = JSON.parse(rawUsers);
-      } catch (e) {}
-    }
-
-    // Ensure default Kepala Sekolah, Guru, and Admin exist
-    const hasKepsek = usersList.some(u => u.role === 'KEPALA_SEKOLAH');
-    const hasGuru = usersList.some(u => u.role === 'GURU');
-    const hasAdmin = usersList.some(u => u.role === 'ADMIN');
-
-    let updated = false;
-
-    if (!hasKepsek) {
-      usersList.push({
-        id: 'user-kepsek-01',
-        username: 'kepsek',
-        password: 'password123',
-        full_name: 'Drs. Fransiskus (Kepala Sekolah)',
-        nuptk: '197508122001121001',
-        role: 'KEPALA_SEKOLAH',
-        status: 'APPROVED',
-        is_active: true,
-        created_at: new Date().toISOString(),
-      });
-      updated = true;
-    }
-
-    if (!hasGuru) {
-      usersList.push({
-        id: 'user-guru-01',
-        username: 'guru1',
-        password: 'password123',
-        full_name: 'Ibu Maria Guru S.Pd',
-        nuptk: '198203152006042003',
-        role: 'GURU',
-        status: 'APPROVED',
-        wali_kelas: 'Kelas 1 Autis',
-        is_active: true,
-        created_at: new Date().toISOString(),
-      });
-      updated = true;
-    }
-
-    if (!hasAdmin) {
-      usersList.push({
-        id: 'user-admin-01',
-        username: 'admin1',
-        password: 'password123',
-        full_name: 'Pak Budi Santoso (Admin)',
-        nuptk: '198905202014021002',
-        role: 'ADMIN',
-        status: 'APPROVED',
-        is_active: true,
-        created_at: new Date().toISOString(),
-      });
-      updated = true;
-    }
-
-    if (updated || !rawUsers) {
+    if (!rawUsers) return;
+    try {
+      let usersList: UserAccount[] = JSON.parse(rawUsers);
+      const demoUsernames = new Set(['kepsek', 'guru1', 'admin1', 'kepsek_demo']);
+      const demoIds = new Set(['user-kepsek-01', 'user-guru-01', 'user-admin-01']);
+      usersList = usersList.filter(
+        u => !demoUsernames.has(u.username.toLowerCase()) && !demoIds.has(u.id)
+      );
       localStorage.setItem(this.usersKey, JSON.stringify(usersList));
-    }
+    } catch {}
   }
+
 
   private purgeOrphanAttendances() {
     const validStudents = this.getRawStudents();

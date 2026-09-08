@@ -33,12 +33,6 @@ export const LoginModal: React.FC = () => {
     }
   };
 
-  const fillDemoAccount = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-    setErrorMsg(null);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn">
       <div className="w-full max-w-md bg-[#0e1424] border border-slate-800 rounded-lg shadow-2xl overflow-hidden">
@@ -113,42 +107,8 @@ export const LoginModal: React.FC = () => {
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
 
-          {/* Demo Account Helper for testing */}
-          <div className="pt-3 border-t border-slate-800/80">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold text-slate-400">Akun Pengujian (Demo):</span>
-              <span className="text-[10px] text-slate-400 font-mono">Password: password123</span>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('kepsek', 'password123')}
-                className="px-2 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition"
-              >
-                <div className="text-[10px] font-bold text-amber-400">Kepsek</div>
-                <div className="text-[10px] text-slate-400 font-mono">kepsek</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('guru1', 'password123')}
-                className="px-2 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition"
-              >
-                <div className="text-[10px] font-bold text-emerald-400">Guru</div>
-                <div className="text-[10px] text-slate-400 font-mono">guru1</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('admin1', 'password123')}
-                className="px-2 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition"
-              >
-                <div className="text-[10px] font-bold text-blue-400">Admin</div>
-                <div className="text-[10px] text-slate-400 font-mono">admin1</div>
-              </button>
-            </div>
-          </div>
-
           {/* Registration Notice */}
-          <div className="pt-2 text-center">
+          <div className="pt-3 border-t border-slate-800/80 text-center">
             <p className="text-xs text-slate-400">
               Belum memiliki akun terdaftar?{' '}
               <button
@@ -168,3 +128,4 @@ export const LoginModal: React.FC = () => {
     </div>
   );
 };
+

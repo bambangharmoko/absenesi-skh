@@ -100,7 +100,11 @@ export const RegisterModal: React.FC = () => {
       const targetEmail = email.trim() || TARGET_KEPSEK_EMAIL;
       setIsSendingOtp(true);
       try {
-        const res = await otpService.sendOtp(targetEmail);
+        const res = await otpService.sendOtp(targetEmail, fullName.trim());
+        if (!res.success) {
+          setErrorMsg(res.error || res.message || 'Gagal mengirimkan kode OTP ke email.');
+          return;
+        }
         setStep('OTP_VERIFY');
         setOtpCountdown(60);
       } catch (err: any) {
@@ -134,7 +138,11 @@ export const RegisterModal: React.FC = () => {
     setErrorMsg(null);
     setIsSendingOtp(true);
     try {
-      await otpService.sendOtp(email.trim() || TARGET_KEPSEK_EMAIL);
+      const res = await otpService.sendOtp(email.trim() || TARGET_KEPSEK_EMAIL, fullName.trim());
+      if (!res.success) {
+        setErrorMsg(res.error || res.message || 'Gagal mengirim ulang OTP.');
+        return;
+      }
       setOtpCountdown(60);
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal mengirim ulang OTP.');
