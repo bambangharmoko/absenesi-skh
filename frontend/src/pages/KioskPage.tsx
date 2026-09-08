@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CameraScanner } from '../components/kiosk/CameraScanner';
 import { CelebrationModal } from '../components/kiosk/CelebrationModal';
-import { VerifyFrameResponse, api, AttendanceSummary } from '../services/api';
+import { VerifyFrameResponse, api, AttendanceSummary, ClassRoomCombination } from '../services/api';
 import { Maximize2, Minimize2, Info, Volume2, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 interface KioskPageProps {
@@ -13,6 +13,17 @@ export const KioskPage: React.FC<KioskPageProps> = ({ onGoToDashboard }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [summary, setSummary] = useState<AttendanceSummary | null>(null);
+  const [classRooms, setClassRooms] = useState<ClassRoomCombination[]>(() =>
+    api.getClassRooms(true)
+  );
+
+  useEffect(() => {
+    const handleClassUpdate = () => {
+      setClassRooms(api.getClassRooms(true));
+    };
+    window.addEventListener('skh_class_rooms_updated', handleClassUpdate);
+    return () => window.removeEventListener('skh_class_rooms_updated', handleClassUpdate);
+  }, []);
 
   const loadSummary = () => {
     api.getAttendanceSummary(selectedClass).then(setSummary).catch(() => {});
@@ -64,9 +75,11 @@ export const KioskPage: React.FC<KioskPageProps> = ({ onGoToDashboard }) => {
             className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-medium text-slate-200 focus:outline-none focus:border-blue-500 transition"
           >
             <option value="all">Semua Kelas SKH</option>
-            <option value="Kelas 1 Autis">Kelas 1 Autis</option>
-            <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
-            <option value="Kelas 3 Tunagrahita">Kelas 3 Tunagrahita</option>
+            {classRooms.map(c => (
+              <option key={c.id} value={c.display_name}>
+                {c.display_name}
+              </option>
+            ))}
           </select>
 
           {/* Fullscreen Button */}

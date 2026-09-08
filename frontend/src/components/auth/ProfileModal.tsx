@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, CreditCard, School, Lock, X, Check, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { User, CreditCard, School, Lock, X, Check, CheckCircle2, AlertCircle, Eye, EyeOff, Clock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api, ClassRoomCombination } from '../../services/api';
 
@@ -21,7 +21,7 @@ export const ProfileModal: React.FC = () => {
     if (currentUser) {
       setFullName(currentUser.full_name || '');
       setNuptk(currentUser.nuptk || '');
-      setWaliKelas(currentUser.wali_kelas || '');
+      setWaliKelas(currentUser.requested_wali_kelas || currentUser.wali_kelas || '');
       setNewPassword('');
       setErrorMsg(null);
       setSuccessMsg(null);
@@ -52,19 +52,36 @@ export const ProfileModal: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // 1. Update basic profile info
       await api.updateUserProfile(currentUser.id, {
         full_name: fullName.trim(),
         nuptk: nuptk.trim(),
-        wali_kelas: waliKelas,
         password: newPassword.trim() ? newPassword.trim() : undefined,
       });
 
+      // 2. If teacher changed or submitted Wali Kelas request
+      let statusNotice = 'Profil berhasil diperbarui!';
+      if (currentUser.role === 'GURU') {
+        const targetClass = waliKelas.trim();
+        const currentApprovedClass = currentUser.wali_kelas || '';
+        const currentRequestedClass = currentUser.requested_wali_kelas || '';
+
+        if (targetClass !== currentApprovedClass || targetClass !== currentRequestedClass || currentUser.wali_kelas_status === 'REJECTED') {
+          await api.requestWaliKelas(currentUser.id, targetClass);
+          if (targetClass) {
+            statusNotice = 'Permohonan penugasan Wali Kelas berhasil dikirim ke Kepala Sekolah (Status: Menunggu Persetujuan).';
+          } else {
+            statusNotice = 'Status penugasan Wali Kelas dinonaktifkan.';
+          }
+        }
+      }
+
       refreshUser();
-      setSuccessMsg('Profil & penugasan Wali Kelas berhasil diperbarui!');
+      setSuccessMsg(statusNotice);
       setTimeout(() => {
         setSuccessMsg(null);
         closeProfileModal();
-      }, 1500);
+      }, 1800);
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal memperbarui profil.');
     } finally {
@@ -152,15 +169,44 @@ export const ProfileModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Wali Kelas Selection - ONLY FOR GURU & KEPALA SEKOLAH */}
+          {/* Wali Kelas Selection & Approval Flow - ONLY FOR GURU */}
           {currentUser.role === 'GURU' && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
                 <label className="block text-xs font-semibold text-slate-300">
                   Penugasan Wali Kelas
                 </label>
                 <span className="text-[10px] text-blue-400 font-medium">Kombinasi Kelas + Ruangan</span>
               </div>
+
+              {/* Approval Status Alert Badge */}
+              {currentUser.wali_kelas_status === 'APPROVED' && currentUser.wali_kelas && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div>
+                    <span className="font-semibold">Wali Kelas Disetujui:</span> {currentUser.wali_kelas}
+                  </div>
+                </div>
+              )}
+
+              {currentUser.wali_kelas_status === 'PENDING' && currentUser.requested_wali_kelas && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                  <div>
+                    <span className="font-semibold">Menunggu Persetujuan Kepala Sekolah:</span> {currentUser.requested_wali_kelas}
+                  </div>
+                </div>
+              )}
+
+              {currentUser.wali_kelas_status === 'REJECTED' && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <div>
+                    <span className="font-semibold">Pengajuan Ditolak:</span> Silakan pilih kombinasi kelas baru di bawah untuk diajukan ulang.
+                  </div>
+                </div>
+              )}
+
               <div className="relative">
                 <School className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <select
@@ -176,8 +222,8 @@ export const ProfileModal: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Pilih kombinasi Tingkat Kelas dan Nama Ruangan yang telah ditetapkan oleh Kepala Sekolah.
+              <p className="text-[11px] text-slate-400">
+                Pilih kombinasi kelas & ruangan. Pengajuan akan diteruskan ke Kepala Sekolah untuk disetujui sebelum Jurnal KBM dapat dibuka.
               </p>
             </div>
           )}

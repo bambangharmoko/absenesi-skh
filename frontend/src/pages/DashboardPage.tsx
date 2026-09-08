@@ -15,7 +15,7 @@ import {
 import { LiveAttendanceFeed } from '../components/dashboard/LiveAttendanceFeed';
 import { AttendanceTable } from '../components/dashboard/AttendanceTable';
 import { ManualOverrideModal } from '../components/dashboard/ManualOverrideModal';
-import { api, AttendanceRecord, AttendanceSummary, Student } from '../services/api';
+import { api, AttendanceRecord, AttendanceSummary, Student, ClassRoomCombination } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { AppPage } from '../components/layout/Navbar';
 
@@ -101,11 +101,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     }
   };
 
+  const [classRooms, setClassRooms] = useState<ClassRoomCombination[]>(() =>
+    api.getClassRooms(true)
+  );
+
+  useEffect(() => {
+    const handleClassUpdate = () => {
+      setClassRooms(api.getClassRooms(true));
+    };
+    window.addEventListener('skh_class_rooms_updated', handleClassUpdate);
+    return () => window.removeEventListener('skh_class_rooms_updated', handleClassUpdate);
+  }, []);
+
   const classTabs = [
     { id: 'all', label: 'Semua Kelas' },
-    { id: 'Kelas 1 Autis', label: 'Kelas 1 Autis' },
-    { id: 'Kelas 2 Tunarungu', label: 'Kelas 2 Tunarungu' },
-    { id: 'Kelas 3 Tunagrahita', label: 'Kelas 3 Tunagrahita' },
+    ...classRooms.map(c => ({ id: c.display_name, label: c.display_name })),
   ];
 
   return (

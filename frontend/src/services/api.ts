@@ -427,8 +427,28 @@ export const api = {
     return await db.authenticateUserAsync(username, password);
   },
 
+  async requestWaliKelas(userId: string, className: string): Promise<UserAccount> {
+    return await db.requestWaliKelas(userId, className);
+  },
+
+  async approveWaliKelas(userId: string, className: string): Promise<UserAccount> {
+    return await db.approveWaliKelas(userId, className);
+  },
+
+  async rejectWaliKelas(userId: string): Promise<UserAccount> {
+    return await db.rejectWaliKelas(userId);
+  },
+
   async syncUsers(): Promise<boolean> {
     return await db.syncUsersFromSupabase();
+  },
+
+  async syncClassRooms(): Promise<boolean> {
+    return await db.syncClassRoomsFromSupabase();
+  },
+
+  async syncKbmJournals(): Promise<boolean> {
+    return await db.syncKbmJournalsFromSupabase();
   },
 
   // KBM Journal Endpoints
@@ -436,7 +456,16 @@ export const api = {
     return db.getKbmJournals(className, date);
   },
 
-  async saveKbmJournal(data: Omit<KbmJournalRecord, 'id' | 'created_at'>): Promise<KbmJournalRecord> {
+  async saveKbmJournal(data: {
+    class_name: string;
+    teacher_id: string;
+    teacher_name: string;
+    start_time: string;
+    end_time: string;
+    meeting_topic: string;
+    notes?: string;
+    attendances: KbmAttendanceItem[];
+  }): Promise<KbmJournalRecord> {
     return await db.saveKbmJournal(data);
   },
 

@@ -53,6 +53,8 @@ export interface UserAccount {
   status: UserStatus;
   email?: string;
   wali_kelas?: string;
+  requested_wali_kelas?: string;
+  wali_kelas_status?: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
   is_active: boolean;
   created_at: string;
 }
@@ -91,12 +93,15 @@ export interface KbmAttendanceItem {
 export interface KbmJournalRecord {
   id: string;
   date: string;
-  time_slot: string;
-  subject: string;
+  start_time: string;
+  end_time: string;
+  time_slot?: string;
+  subject?: string;
   class_name: string;
   teacher_id: string;
   teacher_name: string;
   meeting_topic: string;
+  notes?: string;
   attendances: KbmAttendanceItem[];
   created_at: string;
 }
@@ -115,6 +120,8 @@ class DatabaseService {
     this.initDatabase();
     this.syncFromSupabase();
     this.syncUsersFromSupabase();
+    this.syncClassRoomsFromSupabase();
+    this.syncKbmJournalsFromSupabase();
     this.setupRealtimeSubscription();
   }
 
@@ -319,6 +326,135 @@ class DatabaseService {
   }
 
   /**
+   * Broadcast pembaruan struktur kelas & ruangan ke semua klien via Supabase Realtime
+   */
+  private broadcastClassRoomsUpdated() {
+    try {
+      const ch = supabase.channel('skh_realtime_db', { config: { broadcast: { self: false } } });
+      ch.send({
+        type: 'broadcast',
+        event: 'class_rooms_updated',
+        payload: { timestamp: Date.now() },
+      });
+    } catch (err) {
+      console.warn('[Database] Broadcast class_rooms_updated failed:', err);
+    }
+  }
+
+  /**
+   * Broadcast pembaruan Jurnal KBM ke semua klien via Supabase Realtime
+   */
+  private broadcastKbmUpdated() {
+    try {
+      const ch = supabase.channel('skh_realtime_db', { config: { broadcast: { self: false } } });
+      ch.send({
+        type: 'broadcast',
+        event: 'kbm_updated',
+        payload: { timestamp: Date.now() },
+      });
+    } catch (err) {
+      console.warn('[Database] Broadcast kbm_updated failed:', err);
+    }
+  }
+
+  /**
+   * Sinkronisasi data struktur kelas & ruangan dari Supabase Cloud secara real-time
+   */
+  async syncClassRoomsFromSupabase(): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    try {
+      // 1. Fetch class grades
+      const { data: gradesData, error: gErr } = await supabase.from('class_grades').select('*').order('name');
+      if (!gErr && gradesData && gradesData.length > 0) {
+        const grades: ClassGrade[] = gradesData.map(g => ({
+          id: g.id,
+          name: g.name,
+          created_at: g.created_at || new Date().toISOString(),
+        }));
+        localStorage.setItem(this.classGradesKey, JSON.stringify(grades));
+      }
+
+      // 2. Fetch rooms
+      const { data: roomsData, error: rErr } = await supabase.from('rooms').select('*').order('name');
+      if (!rErr && roomsData && roomsData.length > 0) {
+        const rooms: RoomItem[] = roomsData.map(r => ({
+          id: r.id,
+          name: r.name,
+          created_at: r.created_at || new Date().toISOString(),
+        }));
+        localStorage.setItem(this.roomsKey, JSON.stringify(rooms));
+      }
+
+      // 3. Fetch class_rooms
+      const { data: classRoomsData, error: crErr } = await supabase.from('class_rooms').select('*').order('display_name');
+      if (!crErr && classRoomsData && classRoomsData.length > 0) {
+        const currentGrades = this.getClassGrades();
+        const currentRooms = this.getRooms();
+
+        const combinations: ClassRoomCombination[] = classRoomsData.map(cr => {
+          const g = currentGrades.find(grade => grade.id === cr.grade_id);
+          const r = currentRooms.find(room => room.id === cr.room_id);
+          return {
+            id: cr.id,
+            grade_id: cr.grade_id,
+            grade_name: g ? g.name : '',
+            room_id: cr.room_id,
+            room_name: r ? r.name : '',
+            display_name: cr.display_name,
+            is_active: cr.is_active ?? true,
+            created_at: cr.created_at || new Date().toISOString(),
+          };
+        });
+        localStorage.setItem(this.classRoomsKey, JSON.stringify(combinations));
+      }
+
+      window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+      return true;
+    } catch (e) {
+      console.warn('[Database] Sync class rooms exception:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Sinkronisasi data Jurnal KBM dari Supabase Cloud secara real-time
+   */
+  async syncKbmJournalsFromSupabase(): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    try {
+      const { data, error } = await supabase
+        .from('kbm_journals')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) return false;
+
+      if (data && data.length > 0) {
+        const mapped: KbmJournalRecord[] = data.map(j => ({
+          id: j.id,
+          date: j.date,
+          start_time: j.start_time || '07:30',
+          end_time: j.end_time || '09:00',
+          time_slot: `${j.start_time || '07:30'} - ${j.end_time || '09:00'}`,
+          class_name: j.class_name,
+          teacher_id: j.teacher_id,
+          teacher_name: j.teacher_name,
+          meeting_topic: j.meeting_topic,
+          notes: j.notes || '',
+          attendances: j.attendances_json ? (typeof j.attendances_json === 'string' ? JSON.parse(j.attendances_json) : j.attendances_json) : [],
+          created_at: j.created_at || new Date().toISOString(),
+        }));
+        localStorage.setItem(this.kbmJournalsKey, JSON.stringify(mapped));
+        window.dispatchEvent(new CustomEvent('skh_kbm_updated'));
+        return true;
+      }
+    } catch (e) {
+      console.warn('[Database] Sync kbm journals exception:', e);
+    }
+    return false;
+  }
+
+  /**
    * Sinkronisasi data akun pengguna (users) dari Supabase Cloud secara real-time
    */
   async syncUsersFromSupabase(): Promise<boolean> {
@@ -341,6 +477,8 @@ class DatabaseService {
           let nuptk = '';
           let email: string | undefined = undefined;
           let wali_kelas = '';
+          let requested_wali_kelas: string | undefined = undefined;
+          let wali_kelas_status: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED' = 'NONE';
 
           if (typeof u.hashed_password === 'string' && u.hashed_password.startsWith('{')) {
             try {
@@ -350,7 +488,11 @@ class DatabaseService {
               nuptk = parsed.nuptk || nuptk;
               email = parsed.email || undefined;
               wali_kelas = parsed.wali_kelas || wali_kelas;
+              requested_wali_kelas = parsed.requested_wali_kelas || requested_wali_kelas;
+              wali_kelas_status = parsed.wali_kelas_status || (wali_kelas ? 'APPROVED' : 'NONE');
             } catch {}
+          } else if (wali_kelas) {
+            wali_kelas_status = 'APPROVED';
           }
 
           return {
@@ -363,6 +505,8 @@ class DatabaseService {
             status,
             email,
             wali_kelas: wali_kelas || undefined,
+            requested_wali_kelas: requested_wali_kelas || undefined,
+            wali_kelas_status: wali_kelas_status,
             is_active: u.is_active ?? true,
             created_at: u.created_at || new Date().toISOString(),
           };
@@ -383,6 +527,8 @@ class DatabaseService {
               nuptk: lu.nuptk,
               email: lu.email,
               wali_kelas: lu.wali_kelas,
+              requested_wali_kelas: lu.requested_wali_kelas,
+              wali_kelas_status: lu.wali_kelas_status || (lu.wali_kelas ? 'APPROVED' : 'NONE'),
             };
             await supabase.from('users').upsert({
               id: cleanId,
@@ -406,7 +552,7 @@ class DatabaseService {
 
   /**
    * Mengatur langganan Supabase Realtime (PostgreSQL Changes & Broadcast)
-   * Saat ada siswa baru/absen/user baru dari perangkat manapun, UI langsung terupdate secara real-time.
+   * Saat ada data siswa, kelas, user, atau jurnal baru dari perangkat manapun, UI langsung sinkron real-time.
    */
   private setupRealtimeSubscription() {
     if (this.isSubscribedToRealtime || typeof window === 'undefined') return;
@@ -452,12 +598,64 @@ class DatabaseService {
           }
         )
         .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'class_grades' },
+          async () => {
+            await this.syncClassRoomsFromSupabase();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'rooms' },
+          async () => {
+            await this.syncClassRoomsFromSupabase();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'class_rooms' },
+          async () => {
+            await this.syncClassRoomsFromSupabase();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'kbm_journals' },
+          async () => {
+            await this.syncKbmJournalsFromSupabase();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'homeroom_assignments' },
+          async () => {
+            await this.syncUsersFromSupabase();
+            window.dispatchEvent(new CustomEvent('skh_users_updated'));
+          }
+        )
+        .on(
           'broadcast',
           { event: 'users_updated' },
           async () => {
             console.log('[Supabase Realtime] Broadcast users_updated diterima');
             await this.syncUsersFromSupabase();
             window.dispatchEvent(new CustomEvent('skh_users_updated'));
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'class_rooms_updated' },
+          async () => {
+            console.log('[Supabase Realtime] Broadcast class_rooms_updated diterima');
+            await this.syncClassRoomsFromSupabase();
+          }
+        )
+        .on(
+          'broadcast',
+          { event: 'kbm_updated' },
+          async () => {
+            console.log('[Supabase Realtime] Broadcast kbm_updated diterima');
+            await this.syncKbmJournalsFromSupabase();
           }
         )
         .subscribe((status) => {
@@ -475,6 +673,8 @@ class DatabaseService {
             this.syncUsersFromSupabase().then(() => {
               window.dispatchEvent(new CustomEvent('skh_users_updated'));
             });
+            this.syncClassRoomsFromSupabase();
+            this.syncKbmJournalsFromSupabase();
           }
         });
       }
@@ -487,6 +687,8 @@ class DatabaseService {
           this.syncUsersFromSupabase().then(() => {
             window.dispatchEvent(new CustomEvent('skh_users_updated'));
           });
+          this.syncClassRoomsFromSupabase();
+          this.syncKbmJournalsFromSupabase();
         });
 
         // Polling background setiap 4 detik untuk memastikan semua perangkat (laptop/HP) selalu sinkron realtime
@@ -497,6 +699,8 @@ class DatabaseService {
           this.syncUsersFromSupabase().then(() => {
             window.dispatchEvent(new CustomEvent('skh_users_updated'));
           });
+          this.syncClassRoomsFromSupabase();
+          this.syncKbmJournalsFromSupabase();
         }, 4000);
       }
     } catch (err) {
@@ -1536,11 +1740,34 @@ class DatabaseService {
     return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  async saveKbmJournal(data: Omit<KbmJournalRecord, 'id' | 'created_at'>): Promise<KbmJournalRecord> {
+  async saveKbmJournal(data: {
+    class_name: string;
+    teacher_id: string;
+    teacher_name: string;
+    start_time: string;
+    end_time: string;
+    meeting_topic: string;
+    notes?: string;
+    attendances: KbmAttendanceItem[];
+  }): Promise<KbmJournalRecord> {
     const journals = this.getKbmJournals();
+    // Tanggal Pelaksanaan strictly locked to current date
+    const todayStr = new Date().toISOString().split('T')[0];
+    const journalId = this.generateUUID();
+
     const newJournal: KbmJournalRecord = {
-      ...data,
-      id: `kbm-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      id: journalId,
+      date: todayStr,
+      start_time: data.start_time,
+      end_time: data.end_time,
+      time_slot: `${data.start_time} - ${data.end_time}`,
+      subject: '', // Dropped as per PRD
+      class_name: data.class_name,
+      teacher_id: data.teacher_id,
+      teacher_name: data.teacher_name,
+      meeting_topic: data.meeting_topic.trim(),
+      notes: data.notes?.trim() || '',
+      attendances: data.attendances,
       created_at: new Date().toISOString(),
     };
 
@@ -1552,9 +1779,8 @@ class DatabaseService {
       const student = this.getStudentById(item.student_id);
       if (!student) continue;
 
-      const todayStr = newJournal.date;
       const existing = this.getAttendances(todayStr).find(a => a.student_id === item.student_id);
-      const noteStr = `Jurnal KBM ${newJournal.subject} (${newJournal.teacher_name}): ${item.status}${item.notes ? ' - ' + item.notes : ''}`;
+      const noteStr = `Jurnal KBM (${newJournal.teacher_name} [${newJournal.start_time}-${newJournal.end_time}]): ${item.status}${item.notes ? ' - ' + item.notes : ''}`;
 
       if (existing) {
         await this.updateAttendance(existing.id, {
@@ -1571,6 +1797,28 @@ class DatabaseService {
       }
     }
 
+    // Simpan ke Supabase Cloud
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('kbm_journals').insert({
+          id: newJournal.id,
+          teacher_id: newJournal.teacher_id,
+          teacher_name: newJournal.teacher_name,
+          class_name: newJournal.class_name,
+          date: newJournal.date,
+          start_time: newJournal.start_time,
+          end_time: newJournal.end_time,
+          meeting_topic: newJournal.meeting_topic,
+          notes: newJournal.notes,
+          attendances_json: JSON.stringify(newJournal.attendances),
+          created_at: newJournal.created_at,
+        });
+        this.broadcastKbmUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase saveKbmJournal notice:', err);
+      }
+    }
+
     window.dispatchEvent(new CustomEvent('skh_kbm_updated'));
     window.dispatchEvent(new CustomEvent('skh_db_updated'));
     return newJournal;
@@ -1580,6 +1828,16 @@ class DatabaseService {
     let journals = this.getKbmJournals();
     journals = journals.filter(j => j.id !== id);
     localStorage.setItem(this.kbmJournalsKey, JSON.stringify(journals));
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('kbm_journals').delete().eq('id', id);
+        this.broadcastKbmUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase deleteKbmJournal notice:', err);
+      }
+    }
+
     window.dispatchEvent(new CustomEvent('skh_kbm_updated'));
   }
 
@@ -1599,7 +1857,6 @@ class DatabaseService {
 
     if (data.full_name) users[idx].full_name = data.full_name.trim();
     if (data.nuptk) users[idx].nuptk = data.nuptk.trim();
-    if (data.wali_kelas !== undefined) users[idx].wali_kelas = data.wali_kelas.trim();
     if (data.password) users[idx].password = data.password;
 
     localStorage.setItem(this.usersKey, JSON.stringify(users));
@@ -1614,6 +1871,8 @@ class DatabaseService {
           nuptk: u.nuptk,
           email: u.email,
           wali_kelas: u.wali_kelas,
+          requested_wali_kelas: u.requested_wali_kelas,
+          wali_kelas_status: u.wali_kelas_status,
         };
         await supabase
           .from('users')
@@ -1625,6 +1884,162 @@ class DatabaseService {
         this.broadcastUsersUpdated();
       } catch (err) {
         console.warn('[Database] Supabase updateUserProfile failed:', err);
+      }
+    }
+
+    return users[idx];
+  }
+
+  /**
+   * Guru mengajukan penugasan Wali Kelas (Status: PENDING_APPROVAL)
+   */
+  async requestWaliKelas(userId: string, className: string): Promise<UserAccount> {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+
+    const cleanClass = className.trim();
+    users[idx].requested_wali_kelas = cleanClass;
+    users[idx].wali_kelas_status = cleanClass ? 'PENDING' : 'NONE';
+    if (!cleanClass) {
+      users[idx].wali_kelas = '';
+    }
+
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const u = users[idx];
+        const meta = {
+          password: u.password,
+          status: u.status,
+          nuptk: u.nuptk,
+          email: u.email,
+          wali_kelas: u.wali_kelas,
+          requested_wali_kelas: u.requested_wali_kelas,
+          wali_kelas_status: u.wali_kelas_status,
+        };
+        await supabase
+          .from('users')
+          .update({
+            hashed_password: JSON.stringify(meta),
+          })
+          .eq('id', userId);
+
+        if (cleanClass) {
+          await supabase.from('homeroom_assignments').insert({
+            id: this.generateUUID(),
+            user_id: u.id,
+            teacher_name: u.full_name,
+            class_name: cleanClass,
+            status: 'PENDING',
+            requested_at: new Date().toISOString(),
+          });
+        }
+
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase requestWaliKelas notice:', err);
+      }
+    }
+
+    return users[idx];
+  }
+
+  /**
+   * Kepala Sekolah menyetujui penugasan Wali Kelas (Status: APPROVED)
+   */
+  async approveWaliKelas(userId: string, className: string): Promise<UserAccount> {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+
+    const cleanClass = className.trim();
+    users[idx].wali_kelas = cleanClass;
+    users[idx].requested_wali_kelas = cleanClass;
+    users[idx].wali_kelas_status = 'APPROVED';
+
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const u = users[idx];
+        const meta = {
+          password: u.password,
+          status: u.status,
+          nuptk: u.nuptk,
+          email: u.email,
+          wali_kelas: u.wali_kelas,
+          requested_wali_kelas: u.requested_wali_kelas,
+          wali_kelas_status: 'APPROVED',
+        };
+        await supabase
+          .from('users')
+          .update({
+            hashed_password: JSON.stringify(meta),
+          })
+          .eq('id', userId);
+
+        await supabase
+          .from('homeroom_assignments')
+          .update({
+            status: 'APPROVED',
+            approved_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId);
+
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase approveWaliKelas notice:', err);
+      }
+    }
+
+    return users[idx];
+  }
+
+  /**
+   * Kepala Sekolah menolak penugasan Wali Kelas (Status: REJECTED)
+   */
+  async rejectWaliKelas(userId: string): Promise<UserAccount> {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+
+    users[idx].wali_kelas_status = 'REJECTED';
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const u = users[idx];
+        const meta = {
+          password: u.password,
+          status: u.status,
+          nuptk: u.nuptk,
+          email: u.email,
+          wali_kelas: u.wali_kelas,
+          requested_wali_kelas: u.requested_wali_kelas,
+          wali_kelas_status: 'REJECTED',
+        };
+        await supabase
+          .from('users')
+          .update({
+            hashed_password: JSON.stringify(meta),
+          })
+          .eq('id', userId);
+
+        await supabase
+          .from('homeroom_assignments')
+          .update({
+            status: 'REJECTED',
+          })
+          .eq('user_id', userId);
+
+        this.broadcastUsersUpdated();
+      } catch (err) {
+        console.warn('[Database] Supabase rejectWaliKelas notice:', err);
       }
     }
 
@@ -1653,7 +2068,7 @@ class DatabaseService {
     }
 
     const newGrade: ClassGrade = {
-      id: `grade-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      id: this.generateUUID(),
       name: cleanName,
       created_at: new Date().toISOString(),
     };
@@ -1667,6 +2082,7 @@ class DatabaseService {
           id: newGrade.id,
           name: newGrade.name,
         });
+        this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase insert grade notice:', e);
       }
@@ -1690,6 +2106,7 @@ class DatabaseService {
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('class_grades').delete().eq('id', id);
+        this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase delete grade notice:', e);
       }
@@ -1719,7 +2136,7 @@ class DatabaseService {
     }
 
     const newRoom: RoomItem = {
-      id: `room-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      id: this.generateUUID(),
       name: cleanName,
       created_at: new Date().toISOString(),
     };
@@ -1733,6 +2150,7 @@ class DatabaseService {
           id: newRoom.id,
           name: newRoom.name,
         });
+        this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase insert room notice:', e);
       }
@@ -1756,6 +2174,7 @@ class DatabaseService {
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('rooms').delete().eq('id', id);
+        this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase delete room notice:', e);
       }
@@ -1810,7 +2229,7 @@ class DatabaseService {
     }
 
     const newCombination: ClassRoomCombination = {
-      id: `cr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      id: this.generateUUID(),
       grade_id: grade.id,
       grade_name: grade.name,
       room_id: room.id,
@@ -1832,6 +2251,7 @@ class DatabaseService {
           display_name: newCombination.display_name,
           is_active: true,
         });
+        this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase insert class_room notice:', e);
       }
@@ -1852,6 +2272,7 @@ class DatabaseService {
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('class_rooms').update({ is_active: list[idx].is_active }).eq('id', id);
+        this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase update class_room notice:', e);
       }
@@ -1869,6 +2290,7 @@ class DatabaseService {
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('class_rooms').delete().eq('id', id);
+        this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase delete class_room notice:', e);
       }

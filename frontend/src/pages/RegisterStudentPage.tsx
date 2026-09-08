@@ -13,7 +13,7 @@ import {
   RotateCcw,
   Sliders,
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, ClassRoomCombination } from '../services/api';
 import { faceApi, HeadPose } from '../services/faceApi';
 import { audioFeedback } from '../components/kiosk/AudioFeedback';
 import confetti from 'canvas-confetti';
@@ -65,13 +65,29 @@ const POSE_TARGETS: PoseTarget[] = [
 
 export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSuccess, onCancel }) => {
   const [step, setStep] = useState<number>(1);
+  const [classRooms, setClassRooms] = useState<ClassRoomCombination[]>(() =>
+    api.getClassRooms(true)
+  );
+
   const [formData, setFormData] = useState({
     nis: '',
     full_name: '',
     nickname: '',
-    class_name: 'Kelas 1 Autis',
+    class_name: api.getClassRooms(true)[0]?.display_name || 'Kelas 1 Autis',
     category: 'Autism Spectrum',
   });
+
+  useEffect(() => {
+    const handleClassUpdate = () => {
+      const active = api.getClassRooms(true);
+      setClassRooms(active);
+      if (active.length > 0 && !active.some(c => c.display_name === formData.class_name)) {
+        setFormData(prev => ({ ...prev, class_name: active[0].display_name }));
+      }
+    };
+    window.addEventListener('skh_class_rooms_updated', handleClassUpdate);
+    return () => window.removeEventListener('skh_class_rooms_updated', handleClassUpdate);
+  }, [formData.class_name]);
 
   // Face ID Minimalist States
   const [isFaceIdMode, setIsFaceIdMode] = useState<boolean>(true);
@@ -533,11 +549,11 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                 onChange={e => setFormData({ ...formData, class_name: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500 transition"
               >
-                <option value="Kelas 1 Autis">Kelas 1 Autis</option>
-                <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
-                <option value="Kelas 3 Tunagrahita">Kelas 3 Tunagrahita</option>
-                <option value="Kelas Transisi">Kelas Transisi</option>
-                <option value="Kelas Khusus">Kelas Khusus</option>
+                {classRooms.map(c => (
+                  <option key={c.id} value={c.display_name}>
+                    {c.display_name}
+                  </option>
+                ))}
               </select>
             </div>
 

@@ -14,6 +14,7 @@ import {
   Users,
   AlertCircle,
   CheckCircle2,
+  School,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api, UserAccount, UserRole } from '../services/api';
@@ -67,6 +68,32 @@ export const UserManagementPage: React.FC = () => {
     }
   };
 
+  const handleApproveWaliKelas = async (user: UserAccount) => {
+    if (!user.requested_wali_kelas) return;
+    try {
+      await api.approveWaliKelas(user.id, user.requested_wali_kelas);
+      showNotice(
+        'success',
+        `Penugasan Wali Kelas "${user.requested_wali_kelas}" untuk ${user.full_name} berhasil disetujui!`
+      );
+      fetchUsers();
+    } catch (err: any) {
+      showNotice('error', err.message || 'Gagal menyetujui penugasan Wali Kelas.');
+    }
+  };
+
+  const handleRejectWaliKelas = async (user: UserAccount) => {
+    if (confirm(`Tolak pengajuan penugasan Wali Kelas "${user.requested_wali_kelas}" untuk ${user.full_name}?`)) {
+      try {
+        await api.rejectWaliKelas(user.id);
+        showNotice('success', `Pengajuan penugasan Wali Kelas untuk ${user.full_name} telah ditolak.`);
+        fetchUsers();
+      } catch (err: any) {
+        showNotice('error', err.message || 'Gagal menolak penugasan Wali Kelas.');
+      }
+    }
+  };
+
   const handleToggleActive = async (user: UserAccount) => {
     if (user.id === currentUser?.id) {
       alert('Anda tidak dapat menonaktifkan akun Kepala Sekolah yang sedang digunakan.');
@@ -103,6 +130,9 @@ export const UserManagementPage: React.FC = () => {
   };
 
   const pendingUsers = users.filter(u => u.status === 'PENDING');
+  const pendingWaliKelasTeachers = users.filter(
+    u => u.role === 'GURU' && u.wali_kelas_status === 'PENDING' && u.requested_wali_kelas
+  );
   const nonPendingUsers = users.filter(u => u.status !== 'PENDING');
 
   const filteredUsers = nonPendingUsers.filter(u => {
@@ -155,7 +185,7 @@ export const UserManagementPage: React.FC = () => {
       )}
 
       {/* KPI Overview Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Total Akun</span>
@@ -167,16 +197,25 @@ export const UserManagementPage: React.FC = () => {
 
         <div className="p-4 rounded-lg bg-amber-950/20 border border-amber-500/30">
           <div className="flex items-center justify-between text-amber-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Perlu Approval</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Pendaftaran Baru</span>
             <Clock className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl font-bold text-amber-400 font-mono">{pendingUsers.length}</div>
-          <div className="text-[11px] text-amber-300/70 mt-1">Menunggu persetujuan</div>
+          <div className="text-[11px] text-amber-300/70 mt-1">Perlu approval akun</div>
+        </div>
+
+        <div className="p-4 rounded-lg bg-indigo-950/20 border border-indigo-500/30">
+          <div className="flex items-center justify-between text-indigo-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Pengajuan Wali</span>
+            <School className="w-4 h-4 text-indigo-400" />
+          </div>
+          <div className="text-2xl font-bold text-indigo-400 font-mono">{pendingWaliKelasTeachers.length}</div>
+          <div className="text-[11px] text-indigo-300/70 mt-1">Menunggu otorisasi kelas</div>
         </div>
 
         <div className="p-4 rounded-lg bg-slate-900/60 border border-slate-800">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Guru Disetujui</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Guru Terverifikasi</span>
             <GraduationCap className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100 font-mono">{countGuru}</div>
@@ -193,7 +232,7 @@ export const UserManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* SECTION 1: PENDING APPROVALS QUEUE */}
+      {/* SECTION 1: PENDING ACCOUNT APPROVALS QUEUE */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -206,7 +245,7 @@ export const UserManagementPage: React.FC = () => {
         </div>
 
         {pendingUsers.length === 0 ? (
-          <div className="p-6 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+          <div className="p-5 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
             Tidak ada antrean permohonan akun baru saat ini. Seluruh permohonan telah diproses.
           </div>
         ) : (
@@ -281,7 +320,89 @@ export const UserManagementPage: React.FC = () => {
         )}
       </div>
 
-      {/* SECTION 2: REGISTERED USERS MANAGEMENT */}
+      {/* SECTION 2: HOMEROOM APPROVAL WORKFLOW (Persetujuan Wali Kelas) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse"></div>
+            <h3 className="text-base font-bold text-white tracking-tight">
+              Persetujuan Penugasan Wali Kelas ({pendingWaliKelasTeachers.length})
+            </h3>
+          </div>
+          <span className="text-xs text-indigo-400 font-medium">Otorisasi Guru Kelas & Akses Jurnal KBM</span>
+        </div>
+
+        {pendingWaliKelasTeachers.length === 0 ? (
+          <div className="p-5 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+            Tidak ada permohonan penugasan Wali Kelas yang menunggu persetujuan.
+          </div>
+        ) : (
+          <div className="overflow-x-auto border border-indigo-500/30 rounded-lg bg-slate-900/80">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <th className="py-3 px-4">Guru Pemohon</th>
+                  <th className="py-3 px-4">NUPTK</th>
+                  <th className="py-3 px-4">Kombinasi Kelas Diajukan</th>
+                  <th className="py-3 px-4">Status Wali Saat Ini</th>
+                  <th className="py-3 px-4 text-right">Keputusan Kepala Sekolah</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {pendingWaliKelasTeachers.map(u => (
+                  <tr key={u.id} className="hover:bg-slate-800/40 transition">
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-white">{u.full_name}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">@{u.username}</div>
+                    </td>
+
+                    <td className="py-3 px-4 font-mono text-slate-300">{u.nuptk || '-'}</td>
+
+                    <td className="py-3 px-4">
+                      <span className="px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold text-xs">
+                        {u.requested_wali_kelas}
+                      </span>
+                    </td>
+
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span className="text-amber-300 text-xs font-medium">Menunggu Otorisasi</span>
+                      </div>
+                      {u.wali_kelas && (
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          Sebelumnya: {u.wali_kelas}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleApproveWaliKelas(u)}
+                          className="px-3.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Setujui Wali Kelas</span>
+                        </button>
+                        <button
+                          onClick={() => handleRejectWaliKelas(u)}
+                          className="px-3 py-1.5 rounded-md bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-900/50 font-medium text-xs flex items-center gap-1.5 transition"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Tolak</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: REGISTERED USERS MANAGEMENT */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
@@ -323,7 +444,7 @@ export const UserManagementPage: React.FC = () => {
                 <th className="py-2.5 px-4">Pengguna</th>
                 <th className="py-2.5 px-4">NUPTK</th>
                 <th className="py-2.5 px-4">Role & Hak Akses</th>
-                <th className="py-2.5 px-4">Wali Kelas</th>
+                <th className="py-2.5 px-4">Penugasan Wali Kelas</th>
                 <th className="py-2.5 px-4">Status Akun</th>
                 <th className="py-2.5 px-4 text-right">Aksi</th>
               </tr>
@@ -375,7 +496,34 @@ export const UserManagementPage: React.FC = () => {
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-slate-400">{u.wali_kelas || '-'}</td>
+                      <td className="py-3 px-4">
+                        {u.role === 'GURU' ? (
+                          u.requested_wali_kelas && u.wali_kelas_status === 'PENDING' ? (
+                            <div>
+                              <div className="text-amber-400 font-semibold">{u.requested_wali_kelas}</div>
+                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400/80">
+                                <Clock className="w-2.5 h-2.5" /> Menunggu Otorisasi
+                              </span>
+                            </div>
+                          ) : u.wali_kelas && u.wali_kelas_status === 'APPROVED' ? (
+                            <div>
+                              <div className="text-emerald-400 font-semibold">{u.wali_kelas}</div>
+                              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400/80">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Disetujui
+                              </span>
+                            </div>
+                          ) : u.wali_kelas_status === 'REJECTED' ? (
+                            <div>
+                              <div className="text-rose-400 line-through">{u.requested_wali_kelas || u.wali_kelas}</div>
+                              <span className="text-[10px] text-rose-400/80">Ditolak</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500">Belum Ditugaskan</span>
+                          )
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
 
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1.5">

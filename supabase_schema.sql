@@ -115,3 +115,51 @@ CREATE POLICY "Allow public insert class_rooms" ON public.class_rooms FOR INSERT
 CREATE POLICY "Allow public update class_rooms" ON public.class_rooms FOR UPDATE USING (true);
 CREATE POLICY "Allow public delete class_rooms" ON public.class_rooms FOR DELETE USING (true);
 
+-- =========================================================================
+-- STRUKTUR PERSETUJUAN PENUGASAN WALI KELAS (ROLE: GURU & KEPALA SEKOLAH)
+-- =========================================================================
+
+-- 7. Table: homeroom_assignments (Pengajuan & Persetujuan Penugasan Wali Kelas)
+CREATE TABLE IF NOT EXISTS public.homeroom_assignments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    teacher_name VARCHAR(255) NOT NULL,
+    class_name VARCHAR(255) NOT NULL,
+    class_room_id VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, APPROVED, REJECTED
+    requested_at TIMESTAMPTZ DEFAULT NOW(),
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.homeroom_assignments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read homeroom_assignments" ON public.homeroom_assignments FOR SELECT USING (true);
+CREATE POLICY "Allow public insert homeroom_assignments" ON public.homeroom_assignments FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update homeroom_assignments" ON public.homeroom_assignments FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete homeroom_assignments" ON public.homeroom_assignments FOR DELETE USING (true);
+
+-- =========================================================================
+-- STRUKTUR JURNAL KBM & PRESENSI KELAS (TEACHING JOURNAL)
+-- =========================================================================
+
+-- 8. Table: kbm_journals (Catatan Pembelajaran & Presensi Harian Siswa oleh Wali Kelas)
+CREATE TABLE IF NOT EXISTS public.kbm_journals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    teacher_id VARCHAR(100) NOT NULL,
+    teacher_name VARCHAR(255) NOT NULL,
+    class_name VARCHAR(255) NOT NULL,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    start_time VARCHAR(20) NOT NULL, -- Contoh: "07:30"
+    end_time VARCHAR(20) NOT NULL,   -- Contoh: "09:00"
+    meeting_topic TEXT NOT NULL,
+    notes TEXT,
+    attendances_json JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.kbm_journals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read kbm_journals" ON public.kbm_journals FOR SELECT USING (true);
+CREATE POLICY "Allow public insert kbm_journals" ON public.kbm_journals FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update kbm_journals" ON public.kbm_journals FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete kbm_journals" ON public.kbm_journals FOR DELETE USING (true);
+

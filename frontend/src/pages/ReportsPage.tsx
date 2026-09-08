@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileSpreadsheet, Download, Filter, Calendar, Printer, CheckCircle2, Users, FileText } from 'lucide-react';
-import { api, AttendanceSummary } from '../services/api';
+import { api, AttendanceSummary, ClassRoomCombination } from '../services/api';
 
 export const ReportsPage: React.FC = () => {
   const currentDate = new Date();
@@ -8,6 +8,17 @@ export const ReportsPage: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [summary, setSummary] = useState<AttendanceSummary | null>(null);
+  const [classRooms, setClassRooms] = useState<ClassRoomCombination[]>(() =>
+    api.getClassRooms(true)
+  );
+
+  useEffect(() => {
+    const handleClassUpdate = () => {
+      setClassRooms(api.getClassRooms(true));
+    };
+    window.addEventListener('skh_class_rooms_updated', handleClassUpdate);
+    return () => window.removeEventListener('skh_class_rooms_updated', handleClassUpdate);
+  }, []);
 
   useEffect(() => {
     api.getAttendanceSummary(selectedClass).then(setSummary).catch(() => {});
@@ -118,9 +129,11 @@ export const ReportsPage: React.FC = () => {
             className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
           >
             <option value="all">Semua Kelas</option>
-            <option value="Kelas 1 Autis">Kelas 1 Autis</option>
-            <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
-            <option value="Kelas 3 Tunagrahita">Kelas 3 Tunagrahita</option>
+            {classRooms.map(c => (
+              <option key={c.id} value={c.display_name}>
+                {c.display_name}
+              </option>
+            ))}
           </select>
         </div>
       </div>

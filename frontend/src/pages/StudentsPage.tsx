@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, Search, Trash2, Camera, UserCheck, Edit3, X, Check, AlertCircle } from 'lucide-react';
-import { api, Student } from '../services/api';
+import { api, Student, ClassRoomCombination } from '../services/api';
 import { db } from '../services/db';
 import { AppPage } from '../components/layout/Navbar';
 
@@ -26,6 +26,18 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
   });
   const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [classRooms, setClassRooms] = useState<ClassRoomCombination[]>(() =>
+    api.getClassRooms(true)
+  );
+
+  useEffect(() => {
+    const handleClassUpdate = () => {
+      setClassRooms(api.getClassRooms(true));
+    };
+    window.addEventListener('skh_class_rooms_updated', handleClassUpdate);
+    return () => window.removeEventListener('skh_class_rooms_updated', handleClassUpdate);
+  }, []);
 
   const fetchStudents = async () => {
     try {
@@ -141,9 +153,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
           className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300 focus:outline-none focus:border-blue-500 transition"
         >
           <option value="all">Semua Kelas SKH</option>
-          <option value="Kelas 1 Autis">Kelas 1 Autis</option>
-          <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
-          <option value="Kelas 3 Tunagrahita">Kelas 3 Tunagrahita</option>
+          {classRooms.map(c => (
+            <option key={c.id} value={c.display_name}>
+              {c.display_name}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -351,9 +365,11 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {
                     onChange={e => setEditFormData({ ...editFormData, class_name: e.target.value })}
                     className="w-full px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 transition"
                   >
-                    <option value="Kelas 1 Autis">Kelas 1 Autis</option>
-                    <option value="Kelas 2 Tunarungu">Kelas 2 Tunarungu</option>
-                    <option value="Kelas 3 Tunagrahita">Kelas 3 Tunagrahita</option>
+                    {classRooms.map(c => (
+                      <option key={c.id} value={c.display_name}>
+                        {c.display_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
