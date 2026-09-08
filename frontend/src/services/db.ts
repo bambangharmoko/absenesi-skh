@@ -179,7 +179,9 @@ class DatabaseService {
   }
 
   private initSeedClasses() {
-    // 1. Seed Class Grades if empty
+    const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+    // 1. Seed Class Grades if empty or has invalid legacy IDs
     const rawGrades = localStorage.getItem(this.classGradesKey);
     let gradesList: ClassGrade[] = [];
     if (rawGrades) {
@@ -187,23 +189,24 @@ class DatabaseService {
         gradesList = JSON.parse(rawGrades);
       } catch {}
     }
-    if (gradesList.length === 0) {
+    const hasInvalidGradeIds = gradesList.some(g => !isUUID(g.id));
+    if (gradesList.length === 0 || hasInvalidGradeIds) {
       const defaultGrades = [
+        'Kelas 1',
+        'Kelas 2',
+        'Kelas 3',
         'Kelas TK A',
         'Kelas TK B',
-        'Kelas 1 Autis',
-        'Kelas 2 Tunarungu',
-        'Kelas 3 Tunagrahita',
       ];
-      gradesList = defaultGrades.map((name, i) => ({
-        id: `grade-${i + 1}`,
+      gradesList = defaultGrades.map((name) => ({
+        id: this.generateUUID(),
         name,
         created_at: new Date().toISOString(),
       }));
       localStorage.setItem(this.classGradesKey, JSON.stringify(gradesList));
     }
 
-    // 2. Seed Rooms if empty
+    // 2. Seed Rooms if empty or has invalid legacy IDs
     const rawRooms = localStorage.getItem(this.roomsKey);
     let roomsList: RoomItem[] = [];
     if (rawRooms) {
@@ -211,23 +214,24 @@ class DatabaseService {
         roomsList = JSON.parse(rawRooms);
       } catch {}
     }
-    if (roomsList.length === 0) {
+    const hasInvalidRoomIds = roomsList.some(r => !isUUID(r.id));
+    if (roomsList.length === 0 || hasInvalidRoomIds) {
       const defaultRooms = [
-        'Kelas Cemerlang',
-        'Kelas Ceria',
-        'Ruang Anggrek',
-        'Ruang Melati',
-        'Ruang Dahlia',
+        'Autis',
+        'Tunarungu',
+        'Tunagrahita',
+        'Cemerlang',
+        'Ceria',
       ];
-      roomsList = defaultRooms.map((name, i) => ({
-        id: `room-${i + 1}`,
+      roomsList = defaultRooms.map((name) => ({
+        id: this.generateUUID(),
         name,
         created_at: new Date().toISOString(),
       }));
       localStorage.setItem(this.roomsKey, JSON.stringify(roomsList));
     }
 
-    // 3. Seed Combinations if empty
+    // 3. Seed Combinations if empty or has invalid legacy IDs
     const rawCombinations = localStorage.getItem(this.classRoomsKey);
     let combinationsList: ClassRoomCombination[] = [];
     if (rawCombinations) {
@@ -235,19 +239,22 @@ class DatabaseService {
         combinationsList = JSON.parse(rawCombinations);
       } catch {}
     }
-    if (combinationsList.length === 0) {
+    const hasInvalidCombIds = combinationsList.some(
+      c => !isUUID(c.id) || !isUUID(c.grade_id) || !isUUID(c.room_id)
+    );
+    if (combinationsList.length === 0 || hasInvalidCombIds) {
       const defaultPairs = [
-        { gradeName: 'Kelas TK A', roomName: 'Kelas Cemerlang' },
-        { gradeName: 'Kelas TK B', roomName: 'Kelas Ceria' },
-        { gradeName: 'Kelas 1 Autis', roomName: 'Ruang Anggrek' },
-        { gradeName: 'Kelas 2 Tunarungu', roomName: 'Ruang Melati' },
-        { gradeName: 'Kelas 3 Tunagrahita', roomName: 'Ruang Dahlia' },
+        { gradeName: 'Kelas 1', roomName: 'Autis' },
+        { gradeName: 'Kelas 2', roomName: 'Tunarungu' },
+        { gradeName: 'Kelas 3', roomName: 'Tunagrahita' },
+        { gradeName: 'Kelas TK A', roomName: 'Cemerlang' },
+        { gradeName: 'Kelas TK B', roomName: 'Ceria' },
       ];
       combinationsList = defaultPairs.map((p, idx) => {
         const grade = gradesList.find(g => g.name === p.gradeName) || gradesList[idx % gradesList.length];
         const room = roomsList.find(r => r.name === p.roomName) || roomsList[idx % roomsList.length];
         return {
-          id: `cr-${idx + 1}`,
+          id: this.generateUUID(),
           grade_id: grade.id,
           grade_name: grade.name,
           room_id: room.id,
@@ -385,21 +392,30 @@ class DatabaseService {
         localStorage.setItem(this.roomsKey, JSON.stringify(rooms));
       }
 
-      // 3. Fetch class_rooms
+      // 3. Fetch class_rooms (Daftar Kombinasi Terdaftar)
       const { data: classRoomsData, error: crErr } = await supabase.from('class_rooms').select('*').order('display_name');
-      if (!crErr && classRoomsData && classRoomsData.length > 0) {
+      if (!crErr && classRoomsData) {
         const currentGrades = this.getClassGrades();
         const currentRooms = this.getRooms();
 
         const combinations: ClassRoomCombination[] = classRoomsData.map(cr => {
           const g = currentGrades.find(grade => grade.id === cr.grade_id);
           const r = currentRooms.find(room => room.id === cr.room_id);
+          let gradeName = g ? g.name : '';
+          let roomName = r ? r.name : '';
+          if (!gradeName || !roomName) {
+            const parts = (cr.display_name || '').split(' - ');
+            if (parts.length >= 2) {
+              gradeName = gradeName || parts[0];
+              roomName = roomName || parts[1];
+            }
+          }
           return {
             id: cr.id,
             grade_id: cr.grade_id,
-            grade_name: g ? g.name : '',
+            grade_name: gradeName,
             room_id: cr.room_id,
-            room_name: r ? r.name : '',
+            room_name: roomName,
             display_name: cr.display_name,
             is_active: cr.is_active ?? true,
             created_at: cr.created_at || new Date().toISOString(),
@@ -2244,13 +2260,16 @@ class DatabaseService {
 
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('class_rooms').insert({
+        const { error } = await supabase.from('class_rooms').upsert({
           id: newCombination.id,
           grade_id: newCombination.grade_id,
           room_id: newCombination.room_id,
           display_name: newCombination.display_name,
           is_active: true,
-        });
+        }, { onConflict: 'display_name' });
+        if (error) {
+          console.error('[Database] Supabase class_rooms upsert error:', error);
+        }
         this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase insert class_room notice:', e);

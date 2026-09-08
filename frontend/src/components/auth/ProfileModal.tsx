@@ -26,13 +26,16 @@ export const ProfileModal: React.FC = () => {
       setErrorMsg(null);
       setSuccessMsg(null);
 
-      const fetchClasses = () => {
-        const list = api.getClassRooms(true);
-        setAvailableClasses(list);
+      const fetchClasses = async () => {
+        setAvailableClasses(api.getClassRooms(true));
+        await api.syncClassRooms();
+        setAvailableClasses(api.getClassRooms(true));
       };
       fetchClasses();
 
-      const handleClassUpdate = () => fetchClasses();
+      const handleClassUpdate = () => {
+        setAvailableClasses(api.getClassRooms(true));
+      };
       window.addEventListener('skh_class_rooms_updated', handleClassUpdate);
       return () => window.removeEventListener('skh_class_rooms_updated', handleClassUpdate);
     }
@@ -215,6 +218,9 @@ export const ProfileModal: React.FC = () => {
                   className="w-full pl-8 pr-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 focus:outline-none focus:border-blue-500 transition appearance-none"
                 >
                   <option value="">Bukan Wali Kelas (Hanya Guru Pengajar Mapel)</option>
+                  {waliKelas && !availableClasses.some(cr => cr.display_name === waliKelas) && (
+                    <option value={waliKelas}>{waliKelas}</option>
+                  )}
                   {availableClasses.map(cr => (
                     <option key={cr.id} value={cr.display_name}>
                       {cr.display_name}

@@ -44,6 +44,7 @@ export const ManageClassesPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+    api.syncClassRooms().then(() => fetchData());
     const handleUpdate = () => fetchData();
     window.addEventListener('skh_class_rooms_updated', handleUpdate);
     return () => window.removeEventListener('skh_class_rooms_updated', handleUpdate);
