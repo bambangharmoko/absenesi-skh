@@ -1,5 +1,16 @@
-import { db, StudentRecord, AttendanceRecord as DBAttendanceRecord } from './db';
+import {
+  db,
+  StudentRecord,
+  AttendanceRecord as DBAttendanceRecord,
+  UserRole,
+  UserStatus,
+  UserAccount,
+  KbmAttendanceItem,
+  KbmJournalRecord,
+} from './db';
 import { faceApi } from './faceApi';
+
+export type { UserRole, UserStatus, UserAccount, KbmAttendanceItem, KbmJournalRecord };
 
 export interface Student {
   id: string;
@@ -352,6 +363,55 @@ export const api = {
 
   exportAttendanceExcel(date?: string, className?: string) {
     db.exportExcel(date, className);
+  },
+
+  // User Management & RBAC Endpoints
+  getUsers(): UserAccount[] {
+    return db.getUsers();
+  },
+
+  async registerUser(data: {
+    username: string;
+    password: string;
+    full_name: string;
+    nuptk: string;
+    role: UserRole;
+    wali_kelas?: string;
+  }): Promise<UserAccount> {
+    return await db.registerUser(data);
+  },
+
+  async approveUser(id: string): Promise<UserAccount> {
+    return await db.approveUser(id);
+  },
+
+  async rejectUser(id: string): Promise<UserAccount> {
+    return await db.rejectUser(id);
+  },
+
+  async toggleUserActive(id: string): Promise<UserAccount> {
+    return await db.toggleUserActive(id);
+  },
+
+  async deleteUser(id: string): Promise<void> {
+    await db.deleteUser(id);
+  },
+
+  login(username: string, password: string): { success: boolean; user?: UserAccount; error?: string } {
+    return db.authenticateUser(username, password);
+  },
+
+  // KBM Journal Endpoints
+  getKbmJournals(className?: string, date?: string): KbmJournalRecord[] {
+    return db.getKbmJournals(className, date);
+  },
+
+  async saveKbmJournal(data: Omit<KbmJournalRecord, 'id' | 'created_at'>): Promise<KbmJournalRecord> {
+    return await db.saveKbmJournal(data);
+  },
+
+  async deleteKbmJournal(id: string): Promise<void> {
+    await db.deleteKbmJournal(id);
   },
 };
 

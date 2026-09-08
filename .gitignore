@@ -3,7 +3,10 @@ backend/python/
 backend/venv/
 backend/env/
 .env
+.env.*
 backend/.env
+frontend/.env
+frontend/.env.*
 *.env.local
 
 # Python cache & artifacts

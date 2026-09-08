@@ -7,6 +7,8 @@ interface AttendanceTableProps {
   allStudents: Student[];
   onOpenOverride: (studentId: string, currentStatus?: string) => void;
   onDeleteAttendance?: (attendanceId: string, studentName: string) => Promise<void> | void;
+  canEdit?: boolean;
+  onRequireLogin?: () => void;
 }
 
 export const AttendanceTable: React.FC<AttendanceTableProps> = ({
@@ -14,6 +16,8 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
   allStudents,
   onOpenOverride,
   onDeleteAttendance,
+  canEdit = true,
+  onRequireLogin,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -215,26 +219,30 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
 
                   {/* Action */}
                   <td className="py-3 px-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => onOpenOverride(student.id, attendance?.status)}
-                        className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 inline-flex items-center gap-1 transition"
-                      >
-                        <Edit3 className="w-3 h-3 text-blue-400" />
-                        <span>Ubah</span>
-                      </button>
-
-                      {attendance && (
+                    {canEdit ? (
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => setConfirmDelete({ attendanceId: attendance.id, studentName: student.full_name })}
-                          title="Hapus data presensi hari ini"
-                          className="px-2 py-1 rounded-md bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 text-xs font-medium border border-rose-900/50 inline-flex items-center gap-1 transition"
+                          onClick={() => onOpenOverride(student.id, attendance?.status)}
+                          className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 inline-flex items-center gap-1 transition"
                         >
-                          <Trash2 className="w-3 h-3 text-rose-400" />
-                          <span>Hapus</span>
+                          <Edit3 className="w-3 h-3 text-blue-400" />
+                          <span>Ubah</span>
                         </button>
-                      )}
-                    </div>
+
+                        {attendance && (
+                          <button
+                            onClick={() => setConfirmDelete({ attendanceId: attendance.id, studentName: student.full_name })}
+                            title="Hapus data presensi hari ini"
+                            className="px-2 py-1 rounded-md bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 text-xs font-medium border border-rose-900/50 inline-flex items-center gap-1 transition"
+                          >
+                            <Trash2 className="w-3 h-3 text-rose-400" />
+                            <span>Hapus</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-500 font-mono">Publik</span>
+                    )}
                   </td>
                 </tr>
               ))

@@ -8,16 +8,25 @@ import {
   Clock,
   Cloud,
   CheckCircle2,
+  BookOpen,
+  ShieldCheck,
+  LogIn,
+  LogOut,
+  User,
 } from 'lucide-react';
-import { isSupabaseConfigured } from '../../services/supabase';
+import { useAuth } from '../../context/AuthContext';
+
+export type AppPage = 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports' | 'jurnal-kbm' | 'users';
 
 interface NavbarProps {
-  currentPage: 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports';
-  onNavigate: (page: 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports') => void;
+  currentPage: AppPage;
+  onNavigate: (page: AppPage) => void;
   onRefreshData?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
+  const { currentUser, isAuthenticated, role, logout, openLoginModal } = useAuth();
+
   const [timeStr, setTimeStr] = useState<string>('');
   const [dateStr, setDateStr] = useState<string>('');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -60,12 +69,38 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     setDeferredPrompt(null);
   };
 
-  const navItems = [
-    { id: 'kiosk', label: 'Kiosk Absensi', icon: Camera },
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'students', label: 'Data Siswa', icon: Users },
-    { id: 'reports', label: 'Laporan Excel', icon: FileSpreadsheet },
-  ] as const;
+  // Dynamic Navigation Items based on RBAC
+  let navItems: Array<{ id: AppPage; label: string; icon: React.ComponentType<{ className?: string }> }> = [];
+
+  if (!isAuthenticated) {
+    // Guest layout: Only 2 main public pages
+    navItems = [
+      { id: 'kiosk', label: 'Absen Wajah', icon: Camera },
+      { id: 'dashboard', label: 'Dashboard Publik', icon: LayoutDashboard },
+    ];
+  } else if (role === 'GURU') {
+    navItems = [
+      { id: 'kiosk', label: 'Kiosk Absen', icon: Camera },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'jurnal-kbm', label: 'Jurnal KBM', icon: BookOpen },
+    ];
+  } else if (role === 'ADMIN') {
+    navItems = [
+      { id: 'kiosk', label: 'Kiosk Absen', icon: Camera },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'students', label: 'Data Siswa', icon: Users },
+      { id: 'reports', label: 'Laporan Excel', icon: FileSpreadsheet },
+    ];
+  } else if (role === 'KEPALA_SEKOLAH') {
+    navItems = [
+      { id: 'kiosk', label: 'Kiosk Absen', icon: Camera },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'students', label: 'Data Siswa', icon: Users },
+      { id: 'reports', label: 'Laporan Excel', icon: FileSpreadsheet },
+      { id: 'jurnal-kbm', label: 'Jurnal KBM', icon: BookOpen },
+      { id: 'users', label: 'Manajemen User', icon: ShieldCheck },
+    ];
+  }
 
   return (
     <>
@@ -99,7 +134,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
             <nav className="hidden md:flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
               {navItems.map(item => {
                 const Icon = item.icon;
-                const isActive = currentPage === item.id || (item.id === 'students' && currentPage === 'register');
+                const isActive =
+                  currentPage === item.id || (item.id === 'students' && currentPage === 'register');
                 return (
                   <button
                     key={item.id}
@@ -117,18 +153,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
               })}
             </nav>
 
-            {/* Right Status & Meta Actions */}
+            {/* Right Status & Auth Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Supabase Realtime Status Badge */}
-              <div
-                title="Database Supabase Cloud Terhubung & Sinkron Real-time"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-800 text-slate-300 text-xs font-medium select-none"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <Cloud className="w-3.5 h-3.5 text-blue-400" />
-                <span className="hidden sm:inline text-slate-300 font-medium text-[11px]">Realtime Cloud</span>
-              </div>
-
               {/* Minimal Digital Clock */}
               <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-800 font-mono text-xs tabular-nums text-slate-300">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -139,29 +165,77 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
               {isInstallable && (
                 <button
                   onClick={handleInstallClick}
-                  className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
+                  className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Install PWA</span>
                 </button>
               )}
 
-              {/* Mobile Kiosk Switcher */}
-              <button
-                onClick={() => onNavigate(currentPage === 'kiosk' ? 'dashboard' : 'kiosk')}
-                className="md:hidden p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs"
-              >
-                {currentPage === 'kiosk' ? <LayoutDashboard className="w-4 h-4" /> : <Camera className="w-4 h-4 text-blue-400" />}
-              </button>
+              {/* Auth Button or User Profile Chip */}
+              {!isAuthenticated ? (
+                <button
+                  onClick={openLoginModal}
+                  className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Login Petugas</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="hidden sm:flex flex-col text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span className="text-xs font-semibold text-slate-100 max-w-[130px] truncate">
+                        {currentUser?.full_name}
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                          role === 'KEPALA_SEKOLAH'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : role === 'ADMIN'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        }`}
+                      >
+                        {role === 'KEPALA_SEKOLAH' ? 'Kepsek' : role}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">@{currentUser?.username}</span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      logout();
+                      onNavigate('dashboard');
+                    }}
+                    title="Keluar dari sistem"
+                    className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-md bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-800/50 text-slate-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 transition"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Keluar</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Mobile Bottom Navigation Bar */}
-        <div className="md:hidden grid grid-cols-4 bg-[#0d1322] border-t border-slate-800 py-1.5 px-2">
+        <div
+          className={`md:hidden grid ${
+            navItems.length <= 2
+              ? 'grid-cols-2'
+              : navItems.length === 3
+              ? 'grid-cols-3'
+              : navItems.length === 4
+              ? 'grid-cols-4'
+              : 'grid-cols-5'
+          } bg-[#0d1322] border-t border-slate-800 py-1.5 px-2`}
+        >
           {navItems.map(item => {
             const Icon = item.icon;
-            const isActive = currentPage === item.id || (item.id === 'students' && currentPage === 'register');
+            const isActive =
+              currentPage === item.id || (item.id === 'students' && currentPage === 'register');
             return (
               <button
                 key={item.id}
@@ -171,7 +245,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                 }`}
               >
                 <Icon className="w-4 h-4" />
-                <span>{item.label.split(' ')[0]}</span>
+                <span className="truncate max-w-[70px]">{item.label.split(' ')[0]}</span>
               </button>
             );
           })}

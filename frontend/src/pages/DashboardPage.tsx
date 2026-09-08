@@ -1,16 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, UserCheck, AlertTriangle, ShieldCheck, UserX, Plus, RefreshCw, Camera, Filter } from 'lucide-react';
+import {
+  Users,
+  UserCheck,
+  AlertTriangle,
+  ShieldCheck,
+  UserX,
+  Plus,
+  RefreshCw,
+  Camera,
+  Filter,
+  Calendar,
+  Lock,
+} from 'lucide-react';
 import { LiveAttendanceFeed } from '../components/dashboard/LiveAttendanceFeed';
 import { AttendanceTable } from '../components/dashboard/AttendanceTable';
 import { ManualOverrideModal } from '../components/dashboard/ManualOverrideModal';
 import { api, AttendanceRecord, AttendanceSummary, Student } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { AppPage } from '../components/layout/Navbar';
 
 interface DashboardPageProps {
-  onNavigate: (page: 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports') => void;
+  onNavigate: (page: AppPage) => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
+  const { isAuthenticated, role, openLoginModal } = useAuth();
+
+  const todayStr = new Date().toISOString().split('T')[0];
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+
   const [summary, setSummary] = useState<AttendanceSummary | null>(null);
   const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -21,11 +40,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [overrideInitialStatus, setOverrideInitialStatus] = useState<string>('HADIR');
   const [isOverrideOpen, setIsOverrideOpen] = useState<boolean>(false);
 
+  const canEdit = isAuthenticated && (role === 'ADMIN' || role === 'KEPALA_SEKOLAH' || role === 'GURU');
+  const canRegister = isAuthenticated && (role === 'ADMIN' || role === 'KEPALA_SEKOLAH');
+
   const fetchData = useCallback(async () => {
     try {
       const [sumRes, attRes, stdRes] = await Promise.all([
-        api.getAttendanceSummary(selectedClass),
-        api.getTodayAttendance(selectedClass),
+        api.getAttendanceSummary(selectedClass, selectedDate),
+        api.getTodayAttendance(selectedClass, undefined, selectedDate),
         api.getStudents(selectedClass),
       ]);
       setSummary(sumRes);
@@ -36,7 +58,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedClass]);
+  }, [selectedClass, selectedDate]);
 
   useEffect(() => {
     fetchData();
@@ -54,6 +76,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   }, [fetchData]);
 
   const handleOpenOverride = (studentId: string, currentStatus?: string) => {
+    if (!canEdit) {
+      openLoginModal();
+      return;
+    }
     const s = students.find(item => item.id === studentId);
     if (s) {
       setSelectedStudentForOverride(s);
@@ -63,6 +89,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   };
 
   const handleDeleteAttendance = async (attendanceId: string) => {
+    if (!canEdit) {
+      openLoginModal();
+      return;
+    }
     try {
       await api.deleteAttendance(attendanceId);
       await fetchData();
@@ -83,9 +113,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            Dashboard Pemantauan Presensi
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              Dashboard Pemantauan Presensi
+            </h2>
+            {!isAuthenticated ? (
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                Akses Publik
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                Mode Petugas ({role})
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-400 mt-1">
             Monitoring kehadiran siswa SKH Santo Fransiskus Asisi secara real-time
           </p>
@@ -94,41 +135,78 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => onNavigate('kiosk')}
-            className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition"
+            className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-xs transition"
           >
             <Camera className="w-4 h-4" />
             <span>Buka Kiosk Absensi</span>
           </button>
 
-          <button
-            onClick={() => onNavigate('register')}
-            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 border border-slate-700 transition"
-          >
-            <Plus className="w-4 h-4 text-slate-400" />
-            <span>Daftar Siswa Baru</span>
-          </button>
+          {canRegister && (
+            <button
+              onClick={() => onNavigate('register')}
+              className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 border border-slate-700 transition"
+            >
+              <Plus className="w-4 h-4 text-slate-400" />
+              <span>Daftar Siswa Baru</span>
+            </button>
+          )}
+
+          {!isAuthenticated && (
+            <button
+              onClick={openLoginModal}
+              className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center gap-2 border border-slate-800 transition"
+            >
+              <Lock className="w-3.5 h-3.5 text-blue-400" />
+              <span>Login untuk Mengubah</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Class Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-        <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mr-2">
-          <Filter className="w-3.5 h-3.5" />
-          Filter:
-        </span>
-        {classTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setSelectedClass(tab.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-              selectedClass === tab.id
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800 hover:bg-slate-800'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Filter Toolbar: Class and Date Range */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
+        {/* Class Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto">
+          <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mr-1">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            Kelas:
+          </span>
+          {classTabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setSelectedClass(tab.id)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition ${
+                selectedClass === tab.id
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Date Filter */}
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            Tanggal:
+          </span>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={e => setSelectedDate(e.target.value)}
+            className="px-2.5 py-1 rounded-md bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition"
+          />
+          {selectedDate !== todayStr && (
+            <button
+              onClick={() => setSelectedDate(todayStr)}
+              className="text-[11px] text-blue-400 hover:text-blue-300 underline underline-offset-2"
+            >
+              Hari Ini
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Metric Cards Grid */}
@@ -190,7 +268,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <div className="text-2xl sm:text-3xl font-bold text-slate-100 font-mono tabular-nums">
             {summary ? summary.total_absent : 0}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">Belum hadir hari ini</div>
+          <div className="text-[11px] text-slate-400 mt-1">Belum hadir pada tanggal ini</div>
         </div>
       </div>
 
@@ -208,6 +286,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             allStudents={students}
             onOpenOverride={handleOpenOverride}
             onDeleteAttendance={handleDeleteAttendance}
+            canEdit={canEdit}
+            onRequireLogin={openLoginModal}
           />
         </div>
       </div>

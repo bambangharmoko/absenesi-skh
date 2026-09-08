@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Search, Trash2, Camera, UserCheck, Edit3, X, Check, AlertCircle } from 'lucide-react';
 import { api, Student } from '../services/api';
 import { db } from '../services/db';
+import { AppPage } from '../components/layout/Navbar';
 
 interface StudentsPageProps {
-  onNavigate: (page: 'kiosk' | 'dashboard' | 'students' | 'register' | 'reports') => void;
+  onNavigate: (page: AppPage) => void;
 }
 
 export const StudentsPage: React.FC<StudentsPageProps> = ({ onNavigate }) => {

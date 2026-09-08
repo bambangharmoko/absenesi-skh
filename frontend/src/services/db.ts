@@ -40,9 +40,48 @@ export interface AttendanceRecord {
   created_at: string;
 }
 
+export type UserRole = 'ADMIN' | 'GURU' | 'KEPALA_SEKOLAH';
+export type UserStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  password: string;
+  full_name: string;
+  nuptk: string;
+  role: UserRole;
+  status: UserStatus;
+  wali_kelas?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface KbmAttendanceItem {
+  student_id: string;
+  student_name: string;
+  nis: string;
+  status: 'HADIR' | 'IZIN' | 'SAKIT' | 'ALPHA';
+  notes?: string;
+}
+
+export interface KbmJournalRecord {
+  id: string;
+  date: string;
+  time_slot: string;
+  subject: string;
+  class_name: string;
+  teacher_id: string;
+  teacher_name: string;
+  meeting_topic: string;
+  attendances: KbmAttendanceItem[];
+  created_at: string;
+}
+
 class DatabaseService {
   private studentsKey = 'skh_students_v3';
   private attendancesKey = 'skh_attendances_v3';
+  private usersKey = 'skh_users_v1';
+  private kbmJournalsKey = 'skh_kbm_journals_v1';
   private isSubscribedToRealtime = false;
 
   constructor() {
@@ -96,6 +135,76 @@ class DatabaseService {
 
     // PURGE ORPHAN ATTENDANCE RECORDS (belonging to non-existent students)
     this.purgeOrphanAttendances();
+
+    // Initialize seed users if not already present
+    this.initSeedUsers();
+  }
+
+  private initSeedUsers() {
+    const rawUsers = localStorage.getItem(this.usersKey);
+    let usersList: UserAccount[] = [];
+    if (rawUsers) {
+      try {
+        usersList = JSON.parse(rawUsers);
+      } catch (e) {}
+    }
+
+    // Ensure default Kepala Sekolah, Guru, and Admin exist
+    const hasKepsek = usersList.some(u => u.role === 'KEPALA_SEKOLAH');
+    const hasGuru = usersList.some(u => u.role === 'GURU');
+    const hasAdmin = usersList.some(u => u.role === 'ADMIN');
+
+    let updated = false;
+
+    if (!hasKepsek) {
+      usersList.push({
+        id: 'user-kepsek-01',
+        username: 'kepsek',
+        password: 'password123',
+        full_name: 'Drs. Fransiskus (Kepala Sekolah)',
+        nuptk: '197508122001121001',
+        role: 'KEPALA_SEKOLAH',
+        status: 'APPROVED',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      });
+      updated = true;
+    }
+
+    if (!hasGuru) {
+      usersList.push({
+        id: 'user-guru-01',
+        username: 'guru1',
+        password: 'password123',
+        full_name: 'Ibu Maria Guru S.Pd',
+        nuptk: '198203152006042003',
+        role: 'GURU',
+        status: 'APPROVED',
+        wali_kelas: 'Kelas 1 Autis',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      });
+      updated = true;
+    }
+
+    if (!hasAdmin) {
+      usersList.push({
+        id: 'user-admin-01',
+        username: 'admin1',
+        password: 'password123',
+        full_name: 'Pak Budi Santoso (Admin)',
+        nuptk: '198905202014021002',
+        role: 'ADMIN',
+        status: 'APPROVED',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      });
+      updated = true;
+    }
+
+    if (updated || !rawUsers) {
+      localStorage.setItem(this.usersKey, JSON.stringify(usersList));
+    }
   }
 
   private purgeOrphanAttendances() {
@@ -954,6 +1063,203 @@ class DatabaseService {
 
     const filename = `Laporan_Absensi_SKH_${date || 'Semua'}.xlsx`;
     XLSX.writeFile(workbook, filename);
+  }
+
+  // ==================== USER MANAGEMENT & RBAC ====================
+  getUsers(): UserAccount[] {
+    const raw = localStorage.getItem(this.usersKey);
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+
+  getUserById(id: string): UserAccount | undefined {
+    return this.getUsers().find(u => u.id === id);
+  }
+
+  getUserByUsername(username: string): UserAccount | undefined {
+    return this.getUsers().find(u => u.username.toLowerCase() === username.trim().toLowerCase());
+  }
+
+  async registerUser(data: {
+    username: string;
+    password: string;
+    full_name: string;
+    nuptk: string;
+    role: UserRole;
+    wali_kelas?: string;
+  }): Promise<UserAccount> {
+    const users = this.getUsers();
+    const cleanUsername = data.username.trim();
+
+    if (!cleanUsername) throw new Error('Username wajib diisi');
+    if (!data.password) throw new Error('Password wajib diisi');
+    if (!data.full_name) throw new Error('Nama Lengkap wajib diisi');
+    if (!data.nuptk) throw new Error('NUPTK wajib diisi');
+
+    const existing = users.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
+    if (existing) {
+      throw new Error(`Username "${cleanUsername}" sudah digunakan. Silakan gunakan username lain.`);
+    }
+
+    const newUser: UserAccount = {
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      username: cleanUsername,
+      password: data.password,
+      full_name: data.full_name.trim(),
+      nuptk: data.nuptk.trim(),
+      role: data.role,
+      status: 'PENDING',
+      wali_kelas: data.wali_kelas || '',
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+
+    users.push(newUser);
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+    return newUser;
+  }
+
+  async approveUser(id: string): Promise<UserAccount> {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === id);
+    if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+
+    users[idx].status = 'APPROVED';
+    users[idx].is_active = true;
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+    return users[idx];
+  }
+
+  async rejectUser(id: string): Promise<UserAccount> {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === id);
+    if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+
+    users[idx].status = 'REJECTED';
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+    return users[idx];
+  }
+
+  async toggleUserActive(id: string): Promise<UserAccount> {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === id);
+    if (idx === -1) throw new Error('Pengguna tidak ditemukan.');
+
+    users[idx].is_active = !users[idx].is_active;
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+    return users[idx];
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    let users = this.getUsers();
+    users = users.filter(u => u.id !== id);
+    localStorage.setItem(this.usersKey, JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('skh_users_updated'));
+  }
+
+  authenticateUser(username: string, password: string): { success: boolean; user?: UserAccount; error?: string } {
+    const cleanUsername = username.trim().toLowerCase();
+    const user = this.getUsers().find(u => u.username.toLowerCase() === cleanUsername);
+
+    if (!user || user.password !== password) {
+      return { success: false, error: 'Username atau password tidak sesuai.' };
+    }
+
+    if (user.status === 'PENDING') {
+      return {
+        success: false,
+        error: 'Akun Anda masih dalam status menunggu persetujuan (Pending Approval) oleh Kepala Sekolah. Silakan hubungi pimpinan sekolah.',
+      };
+    }
+
+    if (user.status === 'REJECTED') {
+      return {
+        success: false,
+        error: 'Permohonan pendaftaran akun Anda telah ditolak oleh Kepala Sekolah.',
+      };
+    }
+
+    if (!user.is_active) {
+      return {
+        success: false,
+        error: 'Akun Anda dinonaktifkan oleh administrator. Hubungi Kepala Sekolah untuk mengaktifkan kembali.',
+      };
+    }
+
+    return { success: true, user };
+  }
+
+  // ==================== JURNAL KBM & ABSENSI KELAS ====================
+  getKbmJournals(className?: string, date?: string): KbmJournalRecord[] {
+    const raw = localStorage.getItem(this.kbmJournalsKey);
+    let list: KbmJournalRecord[] = [];
+    if (raw) {
+      try {
+        list = JSON.parse(raw);
+      } catch {}
+    }
+    if (className && className !== 'all') {
+      list = list.filter(j => j.class_name === className);
+    }
+    if (date) {
+      list = list.filter(j => j.date === date);
+    }
+    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  async saveKbmJournal(data: Omit<KbmJournalRecord, 'id' | 'created_at'>): Promise<KbmJournalRecord> {
+    const journals = this.getKbmJournals();
+    const newJournal: KbmJournalRecord = {
+      ...data,
+      id: `kbm-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+
+    journals.unshift(newJournal);
+    localStorage.setItem(this.kbmJournalsKey, JSON.stringify(journals));
+
+    // Sinkronkan absensi harian siswa dari jurnal ini
+    for (const item of newJournal.attendances) {
+      const student = this.getStudentById(item.student_id);
+      if (!student) continue;
+
+      const todayStr = newJournal.date;
+      const existing = this.getAttendances(todayStr).find(a => a.student_id === item.student_id);
+      const noteStr = `Jurnal KBM ${newJournal.subject} (${newJournal.teacher_name}): ${item.status}${item.notes ? ' - ' + item.notes : ''}`;
+
+      if (existing) {
+        await this.updateAttendance(existing.id, {
+          status: item.status as AttendanceRecord['status'],
+          notes: noteStr,
+        });
+      } else {
+        await this.createManualAttendance({
+          student,
+          date: todayStr,
+          status: item.status as AttendanceRecord['status'],
+          notes: noteStr,
+        });
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_kbm_updated'));
+    window.dispatchEvent(new CustomEvent('skh_db_updated'));
+    return newJournal;
+  }
+
+  async deleteKbmJournal(id: string): Promise<void> {
+    let journals = this.getKbmJournals();
+    journals = journals.filter(j => j.id !== id);
+    localStorage.setItem(this.kbmJournalsKey, JSON.stringify(journals));
+    window.dispatchEvent(new CustomEvent('skh_kbm_updated'));
   }
 }
 

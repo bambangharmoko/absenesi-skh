@@ -1,0 +1,170 @@
+import React, { useState } from 'react';
+import { Lock, User, AlertCircle, X, CheckCircle2, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+
+export const LoginModal: React.FC = () => {
+  const { isLoginModalOpen, closeLoginModal, login, openRegisterModal } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  if (!isLoginModalOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!username.trim() || !password) {
+      setErrorMsg('Harap isi Username dan Password.');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = login(username.trim(), password);
+    setIsLoading(false);
+
+    if (!result.success) {
+      setErrorMsg(result.error || 'Gagal masuk sistem.');
+    } else {
+      // Clear inputs
+      setUsername('');
+      setPassword('');
+    }
+  };
+
+  const fillDemoAccount = (u: string, p: string) => {
+    setUsername(u);
+    setPassword(p);
+    setErrorMsg(null);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn">
+      <div className="w-full max-w-md bg-[#0e1424] border border-slate-800 rounded-lg shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-md bg-blue-600/15 border border-blue-500/25 flex items-center justify-center text-blue-400">
+              <Lock className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white tracking-tight">Masuk Sistem Presensi</h3>
+              <p className="text-[11px] text-slate-400">SKH Santo Fransiskus Asisi</p>
+            </div>
+          </div>
+          <button
+            onClick={closeLoginModal}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {errorMsg && (
+            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/25 flex items-start gap-2.5 text-rose-300 text-xs leading-relaxed">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div>{errorMsg}</div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Username Petugas / Guru
+            </label>
+            <div className="relative">
+              <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="Masukkan username"
+                autoComplete="username"
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Masukkan password"
+                autoComplete="current-password"
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
+          >
+            <span>{isLoading ? 'Memverifikasi...' : 'Masuk ke Sistem'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Demo Account Helper for testing */}
+          <div className="pt-3 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold text-slate-400">Akun Pengujian (Demo):</span>
+              <span className="text-[10px] text-slate-400 font-mono">Password: password123</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => fillDemoAccount('kepsek', 'password123')}
+                className="px-2 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition"
+              >
+                <div className="text-[10px] font-bold text-amber-400">Kepsek</div>
+                <div className="text-[10px] text-slate-400 font-mono">kepsek</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemoAccount('guru1', 'password123')}
+                className="px-2 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition"
+              >
+                <div className="text-[10px] font-bold text-emerald-400">Guru</div>
+                <div className="text-[10px] text-slate-400 font-mono">guru1</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => fillDemoAccount('admin1', 'password123')}
+                className="px-2 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition"
+              >
+                <div className="text-[10px] font-bold text-blue-400">Admin</div>
+                <div className="text-[10px] text-slate-400 font-mono">admin1</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Registration Notice */}
+          <div className="pt-2 text-center">
+            <p className="text-xs text-slate-400">
+              Belum memiliki akun terdaftar?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  closeLoginModal();
+                  openRegisterModal();
+                }}
+                className="text-blue-400 hover:text-blue-300 font-semibold underline underline-offset-2 ml-1"
+              >
+                Daftar Akun Petugas/Guru
+              </button>
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
