@@ -2075,12 +2075,12 @@ class DatabaseService {
 
   async addClassGrade(name: string): Promise<ClassGrade> {
     const cleanName = name.trim();
-    if (!cleanName) throw new Error('Nama Tingkat Kelas tidak boleh kosong.');
+    if (!cleanName) throw new Error('Nama Kelas tidak boleh kosong.');
 
     const grades = this.getClassGrades();
-    const duplicate = grades.find(g => g.name.toLowerCase() === cleanName.toLowerCase());
+    const duplicate = grades.find(g => g.name.trim().toLowerCase() === cleanName.toLowerCase());
     if (duplicate) {
-      throw new Error(`Tingkat Kelas "${cleanName}" sudah ada dalam sistem.`);
+      throw new Error(`Gagal Menyimpan: Nama Kelas '${cleanName}' sudah pernah dibuat. Harap gunakan nama kelas yang berbeda.`);
     }
 
     const newGrade: ClassGrade = {
@@ -2089,20 +2089,23 @@ class DatabaseService {
       created_at: new Date().toISOString(),
     };
 
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('class_grades').insert({
+        id: newGrade.id,
+        name: newGrade.name,
+      });
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error(`Gagal Menyimpan: Nama Kelas '${cleanName}' sudah pernah dibuat. Harap gunakan nama kelas yang berbeda.`);
+        }
+        throw new Error(error.message || 'Gagal menyimpan ke database Supabase.');
+      }
+      this.broadcastClassRoomsUpdated();
+    }
+
     grades.push(newGrade);
     localStorage.setItem(this.classGradesKey, JSON.stringify(grades));
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('class_grades').insert({
-          id: newGrade.id,
-          name: newGrade.name,
-        });
-        this.broadcastClassRoomsUpdated();
-      } catch (e) {
-        console.warn('[Database] Supabase insert grade notice:', e);
-      }
-    }
 
     window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
     return newGrade;
@@ -2146,9 +2149,9 @@ class DatabaseService {
     if (!cleanName) throw new Error('Nama Ruangan tidak boleh kosong.');
 
     const rooms = this.getRooms();
-    const duplicate = rooms.find(r => r.name.toLowerCase() === cleanName.toLowerCase());
+    const duplicate = rooms.find(r => r.name.trim().toLowerCase() === cleanName.toLowerCase());
     if (duplicate) {
-      throw new Error(`Nama Ruangan "${cleanName}" sudah ada dalam sistem.`);
+      throw new Error(`Gagal Menyimpan: Nama Ruangan '${cleanName}' sudah pernah dibuat. Harap gunakan nama ruangan yang berbeda.`);
     }
 
     const newRoom: RoomItem = {
@@ -2157,20 +2160,23 @@ class DatabaseService {
       created_at: new Date().toISOString(),
     };
 
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('rooms').insert({
+        id: newRoom.id,
+        name: newRoom.name,
+      });
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error(`Gagal Menyimpan: Nama Ruangan '${cleanName}' sudah pernah dibuat. Harap gunakan nama ruangan yang berbeda.`);
+        }
+        throw new Error(error.message || 'Gagal menyimpan ke database Supabase.');
+      }
+      this.broadcastClassRoomsUpdated();
+    }
+
     rooms.push(newRoom);
     localStorage.setItem(this.roomsKey, JSON.stringify(rooms));
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('rooms').insert({
-          id: newRoom.id,
-          name: newRoom.name,
-        });
-        this.broadcastClassRoomsUpdated();
-      } catch (e) {
-        console.warn('[Database] Supabase insert room notice:', e);
-      }
-    }
 
     window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
     return newRoom;
@@ -2228,20 +2234,13 @@ class DatabaseService {
     const combinations = this.getClassRooms();
     const displayName = `${grade.name} - ${room.name}`;
 
-    // Strict validation: Pair must be unique
+    // Frontend State Check: Strict validation: Pair must be unique OR display_name unique
     const pairExists = combinations.find(
-      c => c.grade_id === gradeId && c.room_id === roomId
+      c => (c.grade_id === gradeId && c.room_id === roomId) ||
+           (c.display_name.trim().toLowerCase() === displayName.trim().toLowerCase())
     );
     if (pairExists) {
-      throw new Error(`Kombinasi "${displayName}" sudah pernah didaftarkan.`);
-    }
-
-    // Display name unique check
-    const nameExists = combinations.find(
-      c => c.display_name.toLowerCase() === displayName.toLowerCase()
-    );
-    if (nameExists) {
-      throw new Error(`Kombinasi dengan nama "${displayName}" sudah ada.`);
+      throw new Error(`Gagal Menghubungkan: Kombinasi '${grade.name}' dan '${room.name}' sudah digunakan dalam sistem.`);
     }
 
     const newCombination: ClassRoomCombination = {
@@ -2255,26 +2254,26 @@ class DatabaseService {
       created_at: new Date().toISOString(),
     };
 
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('class_rooms').insert({
+        id: newCombination.id,
+        grade_id: newCombination.grade_id,
+        room_id: newCombination.room_id,
+        display_name: newCombination.display_name,
+        is_active: true,
+      });
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error(`Gagal Menghubungkan: Kombinasi '${grade.name}' dan '${room.name}' sudah digunakan dalam sistem.`);
+        }
+        throw new Error(error.message || 'Gagal menyimpan kombinasi ke database Supabase.');
+      }
+      this.broadcastClassRoomsUpdated();
+    }
+
     combinations.push(newCombination);
     localStorage.setItem(this.classRoomsKey, JSON.stringify(combinations));
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { error } = await supabase.from('class_rooms').upsert({
-          id: newCombination.id,
-          grade_id: newCombination.grade_id,
-          room_id: newCombination.room_id,
-          display_name: newCombination.display_name,
-          is_active: true,
-        }, { onConflict: 'display_name' });
-        if (error) {
-          console.error('[Database] Supabase class_rooms upsert error:', error);
-        }
-        this.broadcastClassRoomsUpdated();
-      } catch (e) {
-        console.warn('[Database] Supabase insert class_room notice:', e);
-      }
-    }
 
     window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
     return newCombination;

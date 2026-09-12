@@ -95,6 +95,11 @@ CREATE TABLE IF NOT EXISTS public.class_rooms (
     CONSTRAINT unique_grade_room UNIQUE (grade_id, room_id)
 );
 
+-- Case-insensitive Uniqueness Constraints
+CREATE UNIQUE INDEX IF NOT EXISTS idx_class_grades_unique_lower_name ON public.class_grades (LOWER(name));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_unique_lower_name ON public.rooms (LOWER(name));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_class_rooms_unique_lower_display_name ON public.class_rooms (LOWER(display_name));
+
 -- Enable RLS & Policies for Class & Room Tables
 ALTER TABLE public.class_grades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;

@@ -8,6 +8,8 @@ import {
   Power,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
+  X,
   Link as LinkIcon,
   Search,
   Filter,
@@ -29,6 +31,7 @@ export const ManageClassesPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [errorPopup, setErrorPopup] = useState<string | null>(null);
 
   const fetchData = () => {
     const g = api.getClassGrades();
@@ -58,15 +61,27 @@ export const ManageClassesPage: React.FC = () => {
   // Add Grade Handler
   const handleAddGrade = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newGradeName.trim()) return;
+    const cleanName = newGradeName.trim();
+    if (!cleanName) return;
+
+    // Frontend State Check: Case-insensitive check
+    const isDuplicate = grades.some(g => g.name.trim().toLowerCase() === cleanName.toLowerCase());
+    if (isDuplicate) {
+      const msg = `Gagal Menyimpan: Nama Kelas '${cleanName}' sudah pernah dibuat. Harap gunakan nama kelas yang berbeda.`;
+      setErrorPopup(msg);
+      showNotice('error', msg);
+      return;
+    }
 
     try {
-      const created = await api.addClassGrade(newGradeName.trim());
+      const created = await api.addClassGrade(cleanName);
       showNotice('success', `Tingkat Kelas "${created.name}" berhasil ditambahkan!`);
       setNewGradeName('');
       fetchData();
     } catch (err: any) {
-      showNotice('error', err.message || 'Gagal menambahkan Tingkat Kelas.');
+      const msg = err.message || 'Gagal menambahkan Tingkat Kelas.';
+      setErrorPopup(msg);
+      showNotice('error', msg);
     }
   };
 
@@ -86,15 +101,27 @@ export const ManageClassesPage: React.FC = () => {
   // Add Room Handler
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRoomName.trim()) return;
+    const cleanName = newRoomName.trim();
+    if (!cleanName) return;
+
+    // Frontend State Check: Case-insensitive check
+    const isDuplicate = rooms.some(r => r.name.trim().toLowerCase() === cleanName.toLowerCase());
+    if (isDuplicate) {
+      const msg = `Gagal Menyimpan: Nama Ruangan '${cleanName}' sudah pernah dibuat. Harap gunakan nama ruangan yang berbeda.`;
+      setErrorPopup(msg);
+      showNotice('error', msg);
+      return;
+    }
 
     try {
-      const created = await api.addRoom(newRoomName.trim());
+      const created = await api.addRoom(cleanName);
       showNotice('success', `Nama Ruangan "${created.name}" berhasil ditambahkan!`);
       setNewRoomName('');
       fetchData();
     } catch (err: any) {
-      showNotice('error', err.message || 'Gagal menambahkan Nama Ruangan.');
+      const msg = err.message || 'Gagal menambahkan Nama Ruangan.';
+      setErrorPopup(msg);
+      showNotice('error', msg);
     }
   };
 
@@ -119,12 +146,32 @@ export const ManageClassesPage: React.FC = () => {
       return;
     }
 
+    const gObj = grades.find(g => g.id === selectedGradeId);
+    const rObj = rooms.find(r => r.id === selectedRoomId);
+    const gradeName = gObj?.name || '';
+    const roomName = rObj?.name || '';
+    const targetDisplay = `${gradeName} - ${roomName}`;
+
+    // Frontend State Check: Pair or Display Name duplicate check
+    const isDuplicate = combinations.some(
+      c => (c.grade_id === selectedGradeId && c.room_id === selectedRoomId) ||
+           (c.display_name.trim().toLowerCase() === targetDisplay.toLowerCase())
+    );
+    if (isDuplicate) {
+      const msg = `Gagal Menghubungkan: Kombinasi '${gradeName}' dan '${roomName}' sudah digunakan dalam sistem.`;
+      setErrorPopup(msg);
+      showNotice('error', msg);
+      return;
+    }
+
     try {
       const created = await api.addClassRoom(selectedGradeId, selectedRoomId);
       showNotice('success', `Kombinasi "${created.display_name}" berhasil dipetakan!`);
       fetchData();
     } catch (err: any) {
-      showNotice('error', err.message || 'Gagal memetakan kombinasi kelas.');
+      const msg = err.message || 'Gagal memetakan kombinasi kelas.';
+      setErrorPopup(msg);
+      showNotice('error', msg);
     }
   };
 
@@ -553,6 +600,61 @@ export const ManageClassesPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* Pop-up Error Notification Dialog (Validasi Gagal) */}
+      {errorPopup && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setErrorPopup(null)}
+        >
+          <div 
+            className="relative w-full max-w-md bg-slate-900 border border-rose-500/40 rounded-xl shadow-2xl p-6 text-slate-100 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Top Close Button */}
+            <button
+              onClick={() => setErrorPopup(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-slate-800"
+              aria-label="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header Icon + Title */}
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 shrink-0 mt-0.5">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  Validasi Gagal
+                </h3>
+                <p className="text-xs text-rose-400 font-medium mt-0.5">
+                  Terjadi Kesalahan / Duplikasi Data
+                </p>
+              </div>
+            </div>
+
+            {/* Message Callout */}
+            <div className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs sm:text-sm leading-relaxed font-medium">
+              {errorPopup}
+            </div>
+
+            {/* Action Footer */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setErrorPopup(null)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white text-xs font-semibold shadow-lg shadow-rose-900/30 transition flex items-center justify-center cursor-pointer"
+                autoFocus
+              >
+                Mengerti & Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}
