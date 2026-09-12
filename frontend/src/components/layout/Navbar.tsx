@@ -25,7 +25,8 @@ export type AppPage =
   | 'reports'
   | 'jurnal-kbm'
   | 'users'
-  | 'manage-classes';
+  | 'manage-classes'
+  | 'operational-hours';
 
 interface NavbarProps {
   currentPage: AppPage;
@@ -131,6 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     ];
     // Secondary: management pages grouped into dropdown
     secondaryNav = [
+      { id: 'operational-hours', label: 'Jam Operasional', icon: Clock },
       { id: 'manage-classes', label: 'Kelola Kelas', icon: Layers },
       { id: 'users', label: 'Manajemen User', icon: ShieldCheck },
       { id: 'jurnal-kbm', label: 'Jurnal KBM', icon: BookOpen },

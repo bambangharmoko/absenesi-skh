@@ -311,6 +311,10 @@ export const api = {
   },
 
   // Attendance Endpoints
+  getAttendances(date?: string, className?: string, status?: string): AttendanceRecord[] {
+    return db.getAttendances(date, className, status);
+  },
+
   async getTodayAttendance(className?: string, status?: string, dateStr?: string): Promise<AttendanceRecord[]> {
     const list = db.getAttendances(dateStr || new Date().toISOString().split('T')[0], className, status);
     return list;
@@ -375,6 +379,10 @@ export const api = {
 
   exportAttendanceExcel(date?: string, className?: string) {
     db.exportExcel(date, className);
+  },
+
+  exportKbmJournalExcel(date?: string, className?: string) {
+    db.exportKbmJournalExcel(date, className);
   },
 
   // User Management & RBAC Endpoints
@@ -512,6 +520,10 @@ export const api = {
 
   async deleteClassRoom(id: string): Promise<void> {
     await db.deleteClassRoom(id);
+  },
+
+  async updateClassOperationalHours(classRoomIds: string[], timeIn: string, timeOut: string): Promise<void> {
+    await db.updateClassOperationalHours(classRoomIds, timeIn, timeOut);
   },
 };
 

@@ -71,6 +71,13 @@ export interface RoomItem {
   created_at: string;
 }
 
+export function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export interface ClassRoomCombination {
   id: string;
   grade_id: string;
@@ -78,6 +85,8 @@ export interface ClassRoomCombination {
   room_id: string;
   room_name: string;
   display_name: string;
+  time_in?: string;
+  time_out?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -417,6 +426,8 @@ class DatabaseService {
             room_id: cr.room_id,
             room_name: roomName,
             display_name: cr.display_name,
+            time_in: cr.time_in || '07:30',
+            time_out: cr.time_out || '12:00',
             is_active: cr.is_active ?? true,
             created_at: cr.created_at || new Date().toISOString(),
           };
@@ -759,7 +770,7 @@ class DatabaseService {
             confidence_score: a.confidence_score ?? 1.0,
             verification_method: a.verification_method || 'FACE_RECOGNITION',
             captured_photo: a.captured_photo || null,
-            captured_photo_out: null,
+            captured_photo_out: a.captured_photo_out || null,
             notes: a.notes || null,
             created_at: a.created_at || new Date().toISOString(),
           };
@@ -1139,7 +1150,7 @@ class DatabaseService {
     list = list.filter(a => validStudentIds.has(a.student_id));
 
     if (date) {
-      list = list.filter(a => a.date === date);
+      list = list.filter(a => a.date === date || a.date.startsWith(date));
     }
 
     if (className && className !== 'ALL' && className !== 'all') {
@@ -1288,7 +1299,7 @@ class DatabaseService {
     record?: AttendanceRecord;
   }> {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalDateString(now);
     const timeStr = now.toTimeString().split(' ')[0];
 
     const allAttendances = this.getAttendances();
@@ -1321,15 +1332,83 @@ class DatabaseService {
 
       if (isSupabaseConfigured()) {
         try {
-          await supabase
+          // 1. Coba update berdasarkan ID baris
+          let { data: updatedRows, error: updateErr } = await supabase
             .from('attendances')
             .update({
               time_out: existing.time_out,
+              captured_photo_out: existing.captured_photo_out,
               notes: existing.notes,
             })
-            .eq('id', existing.id);
-        } catch (e) {
-          console.warn('[Database] Supabase update checkout exception:', e);
+            .eq('id', existing.id)
+            .select();
+
+          // Fallback jika captured_photo_out belum ada di tabel Supabase
+          if (updateErr && updateErr.message?.includes('column "captured_photo_out"')) {
+            const retryRes = await supabase
+              .from('attendances')
+              .update({
+                time_out: existing.time_out,
+                notes: existing.notes,
+              })
+              .eq('id', existing.id)
+              .select();
+            updatedRows = retryRes.data;
+            updateErr = retryRes.error;
+          }
+
+          // 2. Jika tidak ada baris yang ter-update berdasarkan ID (misal karena ID lokal berbeda dari ID cloud),
+          // lakukan fallback update berdasarkan kombinasi unik (student_id, date)
+          if (!updateErr && (!updatedRows || updatedRows.length === 0)) {
+            console.log('[Database] ℹ️ Mencocokkan baris presensi pulang berdasarkan (student_id, date)...');
+            let fallbackRes = await supabase
+              .from('attendances')
+              .update({
+                time_out: existing.time_out,
+                captured_photo_out: existing.captured_photo_out,
+                notes: existing.notes,
+              })
+              .eq('student_id', student.id)
+              .eq('date', todayStr)
+              .select();
+
+            if (fallbackRes.error && fallbackRes.error.message?.includes('column "captured_photo_out"')) {
+              fallbackRes = await supabase
+                .from('attendances')
+                .update({
+                  time_out: existing.time_out,
+                  notes: existing.notes,
+                })
+                .eq('student_id', student.id)
+                .eq('date', todayStr)
+                .select();
+            }
+
+            updatedRows = fallbackRes.data;
+            updateErr = fallbackRes.error;
+          }
+
+          if (updateErr) {
+            console.error('[Database] ❌ Supabase update checkout error:', updateErr);
+            return {
+              status: 'NOT_CHECKED_IN',
+              action: 'NONE',
+              message: `Gagal memperbarui data presensi pulang di server: ${updateErr.message || 'Kesalahan database'}. Silakan coba lagi.`,
+            };
+          }
+
+          // Sinkronkan ID lokal dengan ID baris Supabase jika didapatkan
+          if (updatedRows && updatedRows.length > 0 && updatedRows[0].id) {
+            existing.id = updatedRows[0].id;
+            localStorage.setItem(this.attendancesKey, JSON.stringify(allAttendances));
+          }
+        } catch (e: any) {
+          console.error('[Database] Supabase update checkout exception:', e);
+          return {
+            status: 'NOT_CHECKED_IN',
+            action: 'NONE',
+            message: `Gagal menyimpan presensi pulang ke database: ${e?.message || 'Koneksi terputus'}. Silakan coba lagi.`,
+          };
         }
       }
 
@@ -1430,7 +1509,7 @@ class DatabaseService {
   }
 
   getStats(date?: string, className?: string) {
-    const todayStr = date || new Date().toISOString().split('T')[0];
+    const todayStr = date || getLocalDateString();
     const students = this.getStudents(className);
     const attendances = this.getAttendances(todayStr, className);
 
@@ -1484,9 +1563,52 @@ class DatabaseService {
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Presensi SKH');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Presensi Biometrik');
 
-    const filename = `Laporan_Absensi_SKH_${date || 'Semua'}.xlsx`;
+    const filename = `Laporan_Presensi_Biometrik_SKH_${date || 'Semua'}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+  }
+
+  exportKbmJournalExcel(date?: string, className?: string): void {
+    let journals = this.getKbmJournals();
+    if (className && className !== 'all') {
+      journals = journals.filter(j => j.class_name === className);
+    }
+    if (date && date !== 'all') {
+      journals = journals.filter(j => j.date.startsWith(date));
+    }
+
+    const rows: any[] = [];
+    let no = 1;
+    journals.forEach(j => {
+      const hadirCount = j.attendances?.filter(a => a.status === 'HADIR').length || 0;
+      const izinCount = j.attendances?.filter(a => a.status === 'IZIN').length || 0;
+      const sakitCount = j.attendances?.filter(a => a.status === 'SAKIT').length || 0;
+      const alphaCount = j.attendances?.filter(a => a.status === 'ALPHA').length || 0;
+      const totalSiswa = j.attendances?.length || 0;
+
+      rows.push({
+        No: no++,
+        Tanggal: j.date,
+        Kelas: j.class_name,
+        'Guru Pengajar': j.teacher_name,
+        'Jam Mulai': j.start_time,
+        'Jam Selesai': j.end_time,
+        'Materi / Topik Pembelajaran': j.meeting_topic,
+        'Total Siswa': totalSiswa,
+        'Hadir (KBM)': hadirCount,
+        'Izin (KBM)': izinCount,
+        'Sakit (KBM)': sakitCount,
+        'Alpha (KBM)': alphaCount,
+        'Catatan Guru': j.notes || '-',
+      });
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Jurnal Pembelajaran KBM');
+
+    const filename = `Laporan_Jurnal_KBM_SKH_${date || 'Semua'}.xlsx`;
     XLSX.writeFile(workbook, filename);
   }
 
@@ -2250,6 +2372,8 @@ class DatabaseService {
       room_id: room.id,
       room_name: room.name,
       display_name: displayName,
+      time_in: '07:30',
+      time_out: '12:00',
       is_active: true,
       created_at: new Date().toISOString(),
     };
@@ -2260,6 +2384,8 @@ class DatabaseService {
         grade_id: newCombination.grade_id,
         room_id: newCombination.room_id,
         display_name: newCombination.display_name,
+        time_in: newCombination.time_in,
+        time_out: newCombination.time_out,
         is_active: true,
       });
 
@@ -2311,6 +2437,52 @@ class DatabaseService {
         this.broadcastClassRoomsUpdated();
       } catch (e) {
         console.warn('[Database] Supabase delete class_room notice:', e);
+      }
+    }
+
+    window.dispatchEvent(new CustomEvent('skh_class_rooms_updated'));
+  }
+
+  async updateClassOperationalHours(
+    classRoomIds: string[],
+    timeIn: string,
+    timeOut: string
+  ): Promise<void> {
+    if (!classRoomIds || classRoomIds.length === 0) {
+      throw new Error('Pilih setidaknya satu kelas untuk diperbarui jadwalnya.');
+    }
+    if (!timeIn || !timeOut) {
+      throw new Error('Jam Masuk dan Jam Pulang wajib diisi.');
+    }
+    if (timeOut <= timeIn) {
+      throw new Error('Jam Pulang harus lebih besar dari Jam Masuk.');
+    }
+
+    const list = this.getClassRooms();
+    const updatedIdsSet = new Set(classRoomIds);
+    list.forEach(item => {
+      if (updatedIdsSet.has(item.id)) {
+        item.time_in = timeIn;
+        item.time_out = timeOut;
+      }
+    });
+
+    localStorage.setItem(this.classRoomsKey, JSON.stringify(list));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('class_rooms')
+          .update({ time_in: timeIn, time_out: timeOut })
+          .in('id', classRoomIds);
+
+        if (error) {
+          console.warn('[Database] Supabase update operational hours warning:', error);
+        } else {
+          this.broadcastClassRoomsUpdated();
+        }
+      } catch (err) {
+        console.warn('[Database] Supabase update operational hours notice:', err);
       }
     }
 

@@ -16,6 +16,7 @@ import { LiveAttendanceFeed } from '../components/dashboard/LiveAttendanceFeed';
 import { AttendanceTable } from '../components/dashboard/AttendanceTable';
 import { ManualOverrideModal } from '../components/dashboard/ManualOverrideModal';
 import { api, AttendanceRecord, AttendanceSummary, Student, ClassRoomCombination } from '../services/api';
+import { getLocalDateString } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { AppPage } from '../components/layout/Navbar';
 
@@ -26,7 +27,7 @@ interface DashboardPageProps {
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const { isAuthenticated, role, openLoginModal } = useAuth();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 

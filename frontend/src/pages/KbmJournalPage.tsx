@@ -13,12 +13,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api, Student, KbmJournalRecord, KbmAttendanceItem, ClassRoomCombination } from '../services/api';
+import { getLocalDateString } from '../services/db';
 
 export const KbmJournalPage: React.FC = () => {
   const { currentUser, openProfileModal } = useAuth();
 
   // Tanggal Pelaksanaan automatically and strictly locked to current date
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   const isTeacher = currentUser?.role === 'GURU';
   const isWaliApproved = isTeacher

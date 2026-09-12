@@ -8,6 +8,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { KbmJournalPage } from './pages/KbmJournalPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { ManageClassesPage } from './pages/ManageClassesPage';
+import { ManageOperationalHoursPage } from './pages/ManageOperationalHoursPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
@@ -29,7 +30,8 @@ const AppContent: React.FC = () => {
         currentPage === 'register' ||
         currentPage === 'reports' ||
         currentPage === 'users' ||
-        currentPage === 'manage-classes'
+        currentPage === 'manage-classes' ||
+        currentPage === 'operational-hours'
       ) {
         setCurrentPage('dashboard');
       }
@@ -37,7 +39,8 @@ const AppContent: React.FC = () => {
       if (
         currentPage === 'jurnal-kbm' ||
         currentPage === 'users' ||
-        currentPage === 'manage-classes'
+        currentPage === 'manage-classes' ||
+        currentPage === 'operational-hours'
       ) {
         setCurrentPage('dashboard');
       }
@@ -61,7 +64,8 @@ const AppContent: React.FC = () => {
         page === 'register' ||
         page === 'reports' ||
         page === 'users' ||
-        page === 'manage-classes')
+        page === 'manage-classes' ||
+        page === 'operational-hours')
     ) {
       alert('Halaman ini khusus untuk Role Admin atau Kepala Sekolah.');
       setCurrentPage('dashboard');
@@ -70,9 +74,15 @@ const AppContent: React.FC = () => {
 
     if (
       role === 'ADMIN' &&
-      (page === 'jurnal-kbm' || page === 'users' || page === 'manage-classes')
+      (page === 'jurnal-kbm' || page === 'users' || page === 'manage-classes' || page === 'operational-hours')
     ) {
       alert('Halaman ini khusus untuk Role Guru atau Kepala Sekolah.');
+      setCurrentPage('dashboard');
+      return;
+    }
+
+    if (page === 'operational-hours' && role !== 'KEPALA_SEKOLAH') {
+      alert('Halaman Jam Operasional khusus untuk Role Kepala Sekolah.');
       setCurrentPage('dashboard');
       return;
     }
@@ -98,6 +108,9 @@ const AppContent: React.FC = () => {
         )}
         {currentPage === 'manage-classes' && role === 'KEPALA_SEKOLAH' && (
           <ManageClassesPage />
+        )}
+        {currentPage === 'operational-hours' && role === 'KEPALA_SEKOLAH' && (
+          <ManageOperationalHoursPage />
         )}
         {currentPage === 'students' && (role === 'ADMIN' || role === 'KEPALA_SEKOLAH') && (
           <StudentsPage onNavigate={handleNavigate} />

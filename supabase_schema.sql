@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.face_embeddings (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Table: attendances (Catatan Presensi Masuk & Pulang)
+-- 3. Table: attendances (Catatan Khusus Presensi Biometrik Wajah Masuk & Pulang di Gerbang/Sekolah)
 CREATE TABLE IF NOT EXISTS public.attendances (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
@@ -36,8 +36,11 @@ CREATE TABLE IF NOT EXISTS public.attendances (
     status VARCHAR(50) DEFAULT 'HADIR', -- HADIR, TERLAMBAT, PULANG, IZIN, SAKIT
     confidence_score FLOAT DEFAULT 1.0,
     verification_method VARCHAR(50) DEFAULT 'FACE_RECOGNITION',
+    captured_photo TEXT,
+    captured_photo_out TEXT,
     notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_student_date_attendance UNIQUE (student_id, date)
 );
 
 -- Indexing for Lightning Fast Face Matching & Dashboard Queries
@@ -84,12 +87,14 @@ CREATE TABLE IF NOT EXISTS public.rooms (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. Table: class_rooms (Kombinasi Tingkat Kelas + Ruangan - Contoh: "Kelas TK A - Kelas Cemerlang")
+-- 6. Table: class_rooms (Kombinasi Tingkat Kelas + Ruangan + Jam Operasional)
 CREATE TABLE IF NOT EXISTS public.class_rooms (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     grade_id UUID NOT NULL REFERENCES public.class_grades(id) ON DELETE CASCADE,
     room_id UUID NOT NULL REFERENCES public.rooms(id) ON DELETE CASCADE,
     display_name VARCHAR(255) UNIQUE NOT NULL,
+    time_in VARCHAR(10) DEFAULT '07:30',
+    time_out VARCHAR(10) DEFAULT '12:00',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT unique_grade_room UNIQUE (grade_id, room_id)

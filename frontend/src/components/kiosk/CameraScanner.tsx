@@ -21,7 +21,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { api, VerifyFrameResponse, Student } from '../../services/api';
-import { db } from '../../services/db';
+import { db, getLocalDateString } from '../../services/db';
 import { audioFeedback } from './AudioFeedback';
 
 interface CameraScannerProps {
@@ -281,6 +281,15 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     []
   );
 
+  // When unpausing (e.g. after celebration modal closes), immediately reset HUD and clear bounding box
+  useEffect(() => {
+    if (!isPaused && pendingMatch === null && !showManualModal) {
+      setHudStatus('SEARCHING');
+      setHudLabel('Mencari wajah siswa di depan kamera...');
+      drawHud(null, 'SEARCHING');
+    }
+  }, [isPaused, pendingMatch, showManualModal, drawHud]);
+
   // Continuous Frame Detection Loop
   useEffect(() => {
     if (isPaused || showManualModal || pendingMatch !== null) return;
@@ -358,7 +367,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
     // VALIDATION: Cannot check-out if student has not checked in today!
     if (chosenMode === 'OUT') {
-      const todayList = db.getAttendances(new Date().toISOString().split('T')[0]);
+      const todayList = db.getAttendances(getLocalDateString());
       const currentTodayRecord = todayList.find(a => a.student_id === student.id);
 
       if (!currentTodayRecord || !currentTodayRecord.time_in) {
@@ -489,7 +498,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
     // VALIDATION: If manual mode choice is OUT, check if student checked in today
     if (manualModeChoice === 'OUT') {
-      const todayList = db.getAttendances(new Date().toISOString().split('T')[0]);
+      const todayList = db.getAttendances(getLocalDateString());
       const currentTodayRecord = todayList.find(a => a.student_id === selectedManualStudent.id);
 
       if (!currentTodayRecord || !currentTodayRecord.time_in) {
@@ -557,7 +566,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
   // Calculate today status for pending match
   const todayRecord = pendingMatch
-    ? db.getAttendances(new Date().toISOString().split('T')[0]).find(a => a.student_id === pendingMatch.student.id)
+    ? db.getAttendances(getLocalDateString()).find(a => a.student_id === pendingMatch.student.id)
     : null;
   const isAlreadyCheckedIn = Boolean(todayRecord && todayRecord.time_in);
   const isAlreadyCheckedOut = Boolean(todayRecord && todayRecord.time_out);
