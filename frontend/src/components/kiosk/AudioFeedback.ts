@@ -1,13 +1,12 @@
 /**
- * Audio feedback module with 100% Native Indonesian Natural Voice Engine
- * Specially tuned for Special Needs School (SLB / SKH) students.
+ * Audio feedback module with Natural Indonesian Voice Engine (Google AI Studio style)
+ * Specially tuned with warm, human-like cadence for Special Needs School (SLB / SKH) students.
  */
 
 class AudioFeedbackManager {
   private audioCtx: AudioContext | null = null;
   private indonesianVoice: SpeechSynthesisVoice | null = null;
   private currentAudio: HTMLAudioElement | null = null;
-  private hasCheckedVoices = false;
 
   constructor() {
     this.initVoices();
@@ -17,33 +16,69 @@ class AudioFeedbackManager {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
     const findVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (!voices || voices.length === 0) return;
-
-      this.hasCheckedVoices = true;
-      // Look strictly for Indonesian language voices
-      const found = voices.find(
-        v =>
-          v.lang.toLowerCase().startsWith('id') ||
-          v.lang.toLowerCase().startsWith('in') ||
-          v.name.toLowerCase().includes('indonesia') ||
-          v.name.toLowerCase().includes('gadis') ||
-          v.name.toLowerCase().includes('ardi') ||
-          v.name.toLowerCase().includes('andika')
-      );
-
-      if (found) {
-        this.indonesianVoice = found;
-        console.log('[AudioFeedback] Found local Indonesian voice:', found.name);
-      } else {
-        this.indonesianVoice = null;
-      }
+      this.indonesianVoice = this.getBestIndonesianVoice();
     };
 
     findVoice();
     if (window.speechSynthesis.onvoiceschanged !== undefined) {
       window.speechSynthesis.onvoiceschanged = findVoice;
     }
+  }
+
+  /**
+   * Intelligently selects the highest-quality Natural / AI voice available in the browser.
+   * Priority:
+   * 1. Google AI Studio / Google Assistant Neural Indonesian voice ("Google Bahasa Indonesia")
+   * 2. Edge / Azure Natural Neural Indonesian voice ("Gadis Online (Natural)" / "Ardi Online (Natural)")
+   * 3. Apple Natural Indonesian voice (e.g. Damayanti / Siri)
+   * 4. Modern non-desktop Indonesian voices
+   * 5. Fallback standard Indonesian voices
+   */
+  public getBestIndonesianVoice(): SpeechSynthesisVoice | null {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+
+    // Rank 1: Google Natural Neural Indonesian Voice (as heard in Google AI Studio / Assistant)
+    const googleIdVoice = voices.find(
+      v =>
+        (v.lang.toLowerCase().startsWith('id') || v.name.toLowerCase().includes('indonesia')) &&
+        v.name.toLowerCase().includes('google')
+    );
+    if (googleIdVoice) return googleIdVoice;
+
+    // Rank 2: Microsoft Edge Azure Natural Neural Indonesian Voice
+    const edgeNaturalVoice = voices.find(
+      v =>
+        (v.lang.toLowerCase().startsWith('id') || v.name.toLowerCase().includes('indonesia')) &&
+        (v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('online') || v.name.toLowerCase().includes('neural'))
+    );
+    if (edgeNaturalVoice) return edgeNaturalVoice;
+
+    // Rank 3: Apple / Siri Indonesian voice
+    const appleIdVoice = voices.find(
+      v =>
+        v.lang.toLowerCase().startsWith('id') &&
+        (v.name.toLowerCase().includes('damayanti') || v.name.toLowerCase().includes('siri'))
+    );
+    if (appleIdVoice) return appleIdVoice;
+
+    // Rank 4: Any Indonesian voice that is NOT the old robotic SAPI desktop voice
+    const nonDesktopIdVoice = voices.find(
+      v =>
+        (v.lang.toLowerCase().startsWith('id') || v.lang.toLowerCase().startsWith('in')) &&
+        !v.name.toLowerCase().includes('desktop')
+    );
+    if (nonDesktopIdVoice) return nonDesktopIdVoice;
+
+    // Rank 5: Any Indonesian voice available
+    const anyIdVoice = voices.find(
+      v =>
+        v.lang.toLowerCase().startsWith('id') ||
+        v.lang.toLowerCase().startsWith('in') ||
+        v.name.toLowerCase().includes('indonesia')
+    );
+    return anyIdVoice || null;
   }
 
   private initAudioContext() {
@@ -100,15 +135,14 @@ class AudioFeedbackManager {
   }
 
   /**
-   * Speak text with 100% Guaranteed Native Indonesian Accent
-   * (Uses High-Quality Native Indonesian Audio Stream as primary, never speaks English)
+   * Speak text with high-quality natural Indonesian AI voice (like Google AI Studio / Gemini)
    */
   speakText(text: string) {
     if (!text || !text.trim()) return;
 
-    // Clean formatting for natural speech
+    // Clean formatting and optimize pauses for natural conversational rhythm
     const cleanText = text
-      .replace(/[•*#_~`]/g, '')
+      .replace(/[•*#_~`🎯👉👈👆✓]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -126,23 +160,33 @@ class AudioFeedbackManager {
       } catch (e) {}
     }
 
-    // If local browser HAS a verified Indonesian voice, use SpeechSynthesis
-    if (this.indonesianVoice) {
+    // Dynamic resolution of best voice (Google AI voice preferred)
+    const voice = this.indonesianVoice || this.getBestIndonesianVoice();
+
+    // Primary: Web Speech API with Natural Indonesian AI Voice
+    if ('speechSynthesis' in window) {
       try {
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.voice = this.indonesianVoice;
-        utterance.lang = 'id-ID';
-        utterance.rate = 0.92; // Warm, gentle, friendly pace for SLB students
-        utterance.pitch = 1.1; // Cheerful friendly tone
+        if (voice) {
+          utterance.voice = voice;
+          utterance.lang = voice.lang || 'id-ID';
+        } else {
+          utterance.lang = 'id-ID';
+        }
+
+        // Natural conversational parameters like Google AI Studio (warm, human, fluid)
+        utterance.rate = 0.98; // Natural, friendly conversational speed
+        utterance.pitch = 1.0; // Warm, natural human pitch (no robotic distortion)
+        utterance.volume = 1.0;
+
         window.speechSynthesis.speak(utterance);
         return;
       } catch (e) {
-        console.warn('Local Indonesian voice error, switching to cloud stream:', e);
+        console.warn('Local speech synthesis error, using audio stream fallback:', e);
       }
     }
 
-    // PRIMARY & GUARANTEED 100% INDONESIAN NATIVE STREAM
-    // Never uses English fallback!
+    // Fallback: Google Voice TTS audio stream
     try {
       const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=id&client=tw-ob&q=${encodeURIComponent(
         cleanText
@@ -150,7 +194,7 @@ class AudioFeedbackManager {
       const audio = new Audio(audioUrl);
       this.currentAudio = audio;
       audio.play().catch(playErr => {
-        console.warn('Audio stream autoplay notice:', playErr);
+        console.warn('Audio stream playback notice:', playErr);
       });
     } catch (err) {
       console.warn('Audio playback error:', err);

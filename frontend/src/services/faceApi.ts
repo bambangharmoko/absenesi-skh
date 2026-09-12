@@ -93,9 +93,10 @@ class FaceApiService {
     const jawWidth = Math.max(1, rightJawX - leftJawX);
     const leftDist = noseTipX - leftJawX;
 
-    // Yaw ratio: ~0.5 is centered. > 0.57 is looking right, < 0.43 is looking left.
+    // Yaw ratio: In front camera perspective, turning to user's RIGHT moves nose towards pts[0] (lower x in image).
+    // So (0.5 - yawRatio) becomes POSITIVE (> 10) when turning RIGHT, and NEGATIVE (< -10) when turning LEFT.
     const yawRatio = leftDist / jawWidth;
-    const yaw = (yawRatio - 0.5) * 80;
+    const yaw = (0.5 - yawRatio) * 80;
 
     // Pitch ratio: vertical position of nose tip between nose bridge and chin
     const faceHeight = Math.max(1, chinY - noseBridgeY);
@@ -109,8 +110,8 @@ class FaceApiService {
     const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
 
     let poseCategory: 'CENTER' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN' = 'CENTER';
-    if (yaw < -10) poseCategory = 'LEFT';
-    else if (yaw > 10) poseCategory = 'RIGHT';
+    if (yaw > 10) poseCategory = 'RIGHT';
+    else if (yaw < -10) poseCategory = 'LEFT';
     else if (pitch > 8) poseCategory = 'UP';
     else if (pitch < -8) poseCategory = 'DOWN';
     else poseCategory = 'CENTER';

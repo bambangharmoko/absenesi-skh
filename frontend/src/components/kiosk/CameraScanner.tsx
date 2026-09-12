@@ -319,7 +319,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
           // Speak warm friendly Indonesian greeting for SLB student
           audioFeedback.speakText(
-            `Halo ${res.student.nickname || res.student.name}! Bagaimana kabarmu hari ini? Silakan klik tombol Hadir ya!`
+            `Halo ${res.student.nickname || res.student.name}, senang bertemu denganmu! Silakan konfirmasi presensi ya.`
           );
 
         } else if (res.status === 'UNKNOWN') {
@@ -362,7 +362,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       const currentTodayRecord = todayList.find(a => a.student_id === student.id);
 
       if (!currentTodayRecord || !currentTodayRecord.time_in) {
-        const alertText = `Siswa ${student.nickname} belum ada absen masuk hari ini. Silakan klik tombol Masuk terlebih dahulu ya!`;
+        const alertText = `Halo ${student.nickname}, kamu belum absen masuk hari ini. Silakan klik tombol Masuk terlebih dahulu ya.`;
         setWarningAlertMsg(alertText);
         audioFeedback.speakText(alertText);
         return;
@@ -395,8 +395,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
       const isCheckIn = chosenMode === 'IN' || (chosenMode === 'AUTO' && attResult.action === 'CHECK_IN');
       const speechMessage = isCheckIn
-        ? `Halo ${student.nickname}, presensi masuk kamu berhasil dicatat! Selamat belajar ya!`
-        : `Halo ${student.nickname}, presensi pulang kamu berhasil dicatat! Hati-hati di jalan ya!`;
+        ? `Halo ${student.nickname}, presensi masuk kamu berhasil dicatat! Selamat belajar dan tetap semangat ya!`
+        : `Halo ${student.nickname}, presensi pulang kamu berhasil dicatat! Hati-hati di jalan dan sampai jumpa besok ya!`;
 
       if (attResult.record) {
         const responseObj: VerifyFrameResponse = {
