@@ -33,6 +33,24 @@ export const ManageClassesPage: React.FC = () => {
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [errorPopup, setErrorPopup] = useState<string | null>(null);
 
+  const showNotice = (type: 'success' | 'error', message: string) => {
+    setNotice({ type, message });
+    setTimeout(() => setNotice(null), 4000);
+  };
+
+  // Trigger both native browser window alert and in-app modal popup so user notices immediately
+  const triggerErrorAlert = (message: string) => {
+    setErrorPopup(message);
+    showNotice('error', message);
+    setTimeout(() => {
+      try {
+        window.alert(message);
+      } catch (e) {
+        console.warn('window.alert notice:', e);
+      }
+    }, 50);
+  };
+
   const fetchData = () => {
     const g = api.getClassGrades();
     const r = api.getRooms();
@@ -41,8 +59,21 @@ export const ManageClassesPage: React.FC = () => {
     setRooms(r);
     setCombinations(c);
 
-    if (g.length > 0 && !selectedGradeId) setSelectedGradeId(g[0].id);
-    if (r.length > 0 && !selectedRoomId) setSelectedRoomId(r[0].id);
+    // Keep user's chosen grade if it still exists in list, never overwrite back to default
+    setSelectedGradeId(prev => {
+      if (prev && g.some(item => item.id === prev)) {
+        return prev;
+      }
+      return g.length > 0 ? g[0].id : '';
+    });
+
+    // Keep user's chosen room if it still exists in list, never overwrite back to default
+    setSelectedRoomId(prev => {
+      if (prev && r.some(item => item.id === prev)) {
+        return prev;
+      }
+      return r.length > 0 ? r[0].id : '';
+    });
   };
 
   useEffect(() => {
@@ -53,23 +84,20 @@ export const ManageClassesPage: React.FC = () => {
     return () => window.removeEventListener('skh_class_rooms_updated', handleUpdate);
   }, []);
 
-  const showNotice = (type: 'success' | 'error', message: string) => {
-    setNotice({ type, message });
-    setTimeout(() => setNotice(null), 4000);
-  };
-
   // Add Grade Handler
   const handleAddGrade = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = newGradeName.trim();
-    if (!cleanName) return;
+    if (!cleanName) {
+      triggerErrorAlert('Nama Kelas tidak boleh kosong.');
+      return;
+    }
 
     // Frontend State Check: Case-insensitive check
     const isDuplicate = grades.some(g => g.name.trim().toLowerCase() === cleanName.toLowerCase());
     if (isDuplicate) {
       const msg = `Gagal Menyimpan: Nama Kelas '${cleanName}' sudah pernah dibuat. Harap gunakan nama kelas yang berbeda.`;
-      setErrorPopup(msg);
-      showNotice('error', msg);
+      triggerErrorAlert(msg);
       return;
     }
 
@@ -80,8 +108,7 @@ export const ManageClassesPage: React.FC = () => {
       fetchData();
     } catch (err: any) {
       const msg = err.message || 'Gagal menambahkan Tingkat Kelas.';
-      setErrorPopup(msg);
-      showNotice('error', msg);
+      triggerErrorAlert(msg);
     }
   };
 
@@ -93,7 +120,7 @@ export const ManageClassesPage: React.FC = () => {
         showNotice('success', `Tingkat Kelas "${grade.name}" berhasil dihapus.`);
         fetchData();
       } catch (err: any) {
-        showNotice('error', err.message || 'Gagal menghapus Tingkat Kelas.');
+        triggerErrorAlert(err.message || 'Gagal menghapus Tingkat Kelas.');
       }
     }
   };
@@ -102,14 +129,16 @@ export const ManageClassesPage: React.FC = () => {
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = newRoomName.trim();
-    if (!cleanName) return;
+    if (!cleanName) {
+      triggerErrorAlert('Nama Ruangan tidak boleh kosong.');
+      return;
+    }
 
     // Frontend State Check: Case-insensitive check
     const isDuplicate = rooms.some(r => r.name.trim().toLowerCase() === cleanName.toLowerCase());
     if (isDuplicate) {
       const msg = `Gagal Menyimpan: Nama Ruangan '${cleanName}' sudah pernah dibuat. Harap gunakan nama ruangan yang berbeda.`;
-      setErrorPopup(msg);
-      showNotice('error', msg);
+      triggerErrorAlert(msg);
       return;
     }
 
@@ -120,8 +149,7 @@ export const ManageClassesPage: React.FC = () => {
       fetchData();
     } catch (err: any) {
       const msg = err.message || 'Gagal menambahkan Nama Ruangan.';
-      setErrorPopup(msg);
-      showNotice('error', msg);
+      triggerErrorAlert(msg);
     }
   };
 
@@ -133,7 +161,7 @@ export const ManageClassesPage: React.FC = () => {
         showNotice('success', `Nama Ruangan "${room.name}" berhasil dihapus.`);
         fetchData();
       } catch (err: any) {
-        showNotice('error', err.message || 'Gagal menghapus Nama Ruangan.');
+        triggerErrorAlert(err.message || 'Gagal menghapus Nama Ruangan.');
       }
     }
   };
@@ -142,7 +170,7 @@ export const ManageClassesPage: React.FC = () => {
   const handleAddCombination = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGradeId || !selectedRoomId) {
-      showNotice('error', 'Pilih Tingkat Kelas dan Nama Ruangan terlebih dahulu.');
+      triggerErrorAlert('Pilih Tingkat Kelas dan Nama Ruangan terlebih dahulu.');
       return;
     }
 
@@ -159,8 +187,7 @@ export const ManageClassesPage: React.FC = () => {
     );
     if (isDuplicate) {
       const msg = `Gagal Menghubungkan: Kombinasi '${gradeName}' dan '${roomName}' sudah digunakan dalam sistem.`;
-      setErrorPopup(msg);
-      showNotice('error', msg);
+      triggerErrorAlert(msg);
       return;
     }
 
@@ -170,8 +197,7 @@ export const ManageClassesPage: React.FC = () => {
       fetchData();
     } catch (err: any) {
       const msg = err.message || 'Gagal memetakan kombinasi kelas.';
-      setErrorPopup(msg);
-      showNotice('error', msg);
+      triggerErrorAlert(msg);
     }
   };
 
@@ -185,7 +211,7 @@ export const ManageClassesPage: React.FC = () => {
       );
       fetchData();
     } catch (err: any) {
-      showNotice('error', err.message || 'Gagal mengubah status.');
+      triggerErrorAlert(err.message || 'Gagal mengubah status.');
     }
   };
 
@@ -197,7 +223,7 @@ export const ManageClassesPage: React.FC = () => {
         showNotice('success', `Kombinasi "${comb.display_name}" berhasil dihapus.`);
         fetchData();
       } catch (err: any) {
-        showNotice('error', err.message || 'Gagal menghapus kombinasi.');
+        triggerErrorAlert(err.message || 'Gagal menghapus kombinasi.');
       }
     }
   };
@@ -606,19 +632,19 @@ export const ManageClassesPage: React.FC = () => {
       {/* Pop-up Error Notification Dialog (Validasi Gagal) */}
       {errorPopup && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
           onClick={() => setErrorPopup(null)}
         >
           <div 
-            className="relative w-full max-w-md bg-slate-900 border border-rose-500/40 rounded-xl shadow-2xl p-6 text-slate-100 space-y-4"
+            className="relative w-full max-w-md bg-slate-900 border-2 border-rose-500 rounded-2xl shadow-2xl shadow-rose-950/60 p-6 text-slate-100 space-y-4 animate-in zoom-in-95 duration-150"
             onClick={e => e.stopPropagation()}
           >
             {/* Top Close Button */}
             <button
               onClick={() => setErrorPopup(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-slate-800"
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition p-1.5 rounded-lg hover:bg-slate-800"
               aria-label="Tutup"
             >
               <X className="w-5 h-5" />
@@ -626,21 +652,21 @@ export const ManageClassesPage: React.FC = () => {
 
             {/* Header Icon + Title */}
             <div className="flex items-start gap-3.5">
-              <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 shrink-0 mt-0.5">
-                <AlertCircle className="w-6 h-6" />
+              <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-400 shrink-0 mt-0.5 shadow-xs shadow-rose-500/20">
+                <AlertTriangle className="w-6 h-6 text-rose-400" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Validasi Gagal
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                  Peringatan: Validasi Gagal!
                 </h3>
                 <p className="text-xs text-rose-400 font-medium mt-0.5">
-                  Terjadi Kesalahan / Duplikasi Data
+                  Terjadi Kesalahan / Duplikasi Data Sistem
                 </p>
               </div>
             </div>
 
             {/* Message Callout */}
-            <div className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs sm:text-sm leading-relaxed font-medium">
+            <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 text-xs sm:text-sm leading-relaxed font-semibold">
               {errorPopup}
             </div>
 
@@ -649,7 +675,7 @@ export const ManageClassesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setErrorPopup(null)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white text-xs font-semibold shadow-lg shadow-rose-900/30 transition flex items-center justify-center cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white text-xs sm:text-sm font-bold shadow-lg shadow-rose-900/40 transition flex items-center justify-center cursor-pointer"
                 autoFocus
               >
                 Mengerti & Tutup
