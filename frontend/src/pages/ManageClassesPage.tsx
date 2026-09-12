@@ -38,17 +38,10 @@ export const ManageClassesPage: React.FC = () => {
     setTimeout(() => setNotice(null), 4000);
   };
 
-  // Trigger both native browser window alert and in-app modal popup so user notices immediately
+  // Trigger custom in-app pop-up modal and toast notification
   const triggerErrorAlert = (message: string) => {
     setErrorPopup(message);
     showNotice('error', message);
-    setTimeout(() => {
-      try {
-        window.alert(message);
-      } catch (e) {
-        console.warn('window.alert notice:', e);
-      }
-    }, 50);
   };
 
   const fetchData = () => {
