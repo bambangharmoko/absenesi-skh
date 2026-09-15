@@ -96,11 +96,14 @@ export interface VerifyFrameResponse {
 }
 
 export const api = {
-  // Face Recognition Verification (Pure Client-Side Engine)
+  // Face Recognition Verification (Pure Client-Side Engine with Advanced Biometrics)
   async verifyFrame(imageBase64: string, classId?: string): Promise<VerifyFrameResponse> {
     try {
-      const detection = await faceApi.extractDescriptorFromDataUrl(imageBase64);
-      if (!detection) {
+      const extractResult = await faceApi.extractDescriptorFromDataUrl(imageBase64, {
+        checkQuality: true,
+      });
+
+      if (!extractResult) {
         return {
           status: 'NO_FACE',
           confidence: 0,
@@ -108,6 +111,18 @@ export const api = {
           bounding_box: null,
         };
       }
+
+      // If face quality is compromised (too blurry, too dark, or too small), reject early
+      if (extractResult.quality && !extractResult.quality.isValid) {
+        return {
+          status: 'UNKNOWN',
+          confidence: 0.15,
+          message: extractResult.quality.reason || 'Kualitas gambar wajah kurang tajam / kurang pencahayaan.',
+          bounding_box: null,
+        };
+      }
+
+      const detection = extractResult.descriptor;
 
       // Load enrolled students
       const students = db.getStudents(classId);
@@ -124,24 +139,33 @@ export const api = {
             photo_url: s.latest_photo,
           },
           embeddings: s.embeddings.map(e => new Float32Array(e.vector)),
+          centroid: s.embeddings.length > 1
+            ? faceApi.computeCentroid(s.embeddings.map(e => new Float32Array(e.vector)))
+            : undefined,
         }));
 
-      const match = faceApi.matchFace(detection, enrolledList);
+      // Advanced matching with strict thresholds (maxDistance: 0.42, minSimilarity: 0.88, minMargin: 0.10)
+      const matchRes = faceApi.matchFaceAdvanced(detection, enrolledList, {
+        maxDistance: 0.42,
+        minSimilarity: 0.88,
+        minMargin: 0.10,
+        grayAreaDistance: 0.48,
+      });
 
-      if (!match) {
+      if (matchRes.status !== 'MATCHED' || !matchRes.student) {
         return {
           status: 'UNKNOWN',
-          confidence: 0.2,
-          message: 'Wajah tidak terdaftar dalam database siswa.',
+          confidence: matchRes.confidence,
+          message: matchRes.message,
           bounding_box: null,
         };
       }
 
       return {
         status: 'MATCHED',
-        student: match.student,
-        confidence: match.confidence,
-        message: `Wajah Cocok: ${match.student.name} (${Math.round(match.confidence * 100)}%)`,
+        student: matchRes.student,
+        confidence: matchRes.confidence,
+        message: matchRes.message,
         bounding_box: null,
       };
     } catch (err) {
@@ -149,7 +173,8 @@ export const api = {
       return {
         status: 'NO_FACE',
         confidence: 0,
-        message: 'Gagal memproses frame video.',
+        message: 'Gagal menganalisis frame kamera.',
+        bounding_box: null,
       };
     }
   },
@@ -183,8 +208,12 @@ export const api = {
       throw new Error('NIS, Nama Lengkap, dan Nama Panggilan wajib diisi.');
     }
 
+    if (photos.length < 3) {
+      throw new Error('Pendaftaran biometrik memerlukan minimal 3 foto wajah dari sudut berbeda (Depan, Kiri, Kanan).');
+    }
+
     const processedPhotos: Array<{ pose_label: string; photo_data: string; descriptor: Float32Array }> = [];
-    const poses = ['Lurus', 'Senyum', 'Kiri', 'Kanan', 'Menunduk'];
+    const poses = ['Tampak Depan', 'Miring Kiri', 'Miring Kanan', 'Senyum/Netral', 'Menunduk/Mendongak'];
 
     for (let i = 0; i < photos.length; i++) {
       const blob = photos[i];
@@ -194,23 +223,39 @@ export const api = {
         reader.readAsDataURL(blob);
       });
 
-      const descriptor = await faceApi.extractDescriptorFromDataUrl(dataUrl);
-      if (descriptor) {
+      const extracted = await faceApi.extractDescriptorFromDataUrl(dataUrl, { checkQuality: true });
+      if (extracted) {
+        if (extracted.quality && !extracted.quality.isValid) {
+          throw new Error(`Foto ke-${i + 1} (${poses[i] || 'Pose'}): ${extracted.quality.reason}`);
+        }
         processedPhotos.push({
           pose_label: poses[i] || `Pose ${i + 1}`,
           photo_data: dataUrl,
-          descriptor,
+          descriptor: faceApi.normalizeDescriptor(extracted.descriptor),
         });
       }
     }
 
-    if (processedPhotos.length === 0) {
-      processedPhotos.push({
-        pose_label: 'Sampel 1',
-        photo_data: '',
-        descriptor: new Float32Array(128).map(() => (Math.random() - 0.5) * 0.1),
-      });
+    if (processedPhotos.length < 3) {
+      throw new Error(`Hanya ${processedPhotos.length} foto valid yang terdeteksi. Minimal 3 foto wajah berkualitas tinggi diperlukan.`);
     }
+
+    // Compute centroid vector from all valid samples
+    const centroidDesc = new Float32Array(128);
+    for (const p of processedPhotos) {
+      for (let j = 0; j < 128; j++) {
+        centroidDesc[j] += p.descriptor[j];
+      }
+    }
+    const normalizedCentroid = faceApi.normalizeDescriptor(
+      centroidDesc.map((v) => v / processedPhotos.length)
+    );
+
+    processedPhotos.push({
+      pose_label: 'Centroid (Rata-rata Multi-Sample)',
+      photo_data: processedPhotos[0].photo_data,
+      descriptor: normalizedCentroid,
+    });
 
     const student = await db.saveStudent({
       nis,
@@ -223,7 +268,7 @@ export const api = {
 
     return {
       status: 'SUCCESS',
-      message: `Berhasil mendaftarkan ${student.full_name} dengan ${processedPhotos.length} sampel wajah.`,
+      message: `Berhasil mendaftarkan ${student.full_name} dengan ${processedPhotos.length - 1} pose + 1 centroid vector.`,
       student_id: student.id,
     };
   },
@@ -241,24 +286,51 @@ export const api = {
       throw new Error('NIS, Nama Lengkap, dan Nama Panggilan wajib diisi.');
     }
 
+    if (!samples || samples.length < 3) {
+      throw new Error('Pendaftaran biometrik memerlukan minimal 3 sampel pose wajah (Tampak Depan, Miring Kiri, Miring Kanan) untuk akurasi tinggi.');
+    }
+
     const processedPhotos: Array<{ pose_label: string; photo_data: string; descriptor: Float32Array }> = [];
     for (const s of samples) {
       let desc = s.descriptor;
       if (!desc && s.photo_data) {
-        desc = (await faceApi.extractDescriptorFromDataUrl(s.photo_data)) || undefined;
+        const extracted = await faceApi.extractDescriptorFromDataUrl(s.photo_data, { checkQuality: true });
+        if (extracted) {
+          if (extracted.quality && !extracted.quality.isValid) {
+            throw new Error(`Sampel pose ${s.pose_label} ditolak: ${extracted.quality.reason}`);
+          }
+          desc = extracted.descriptor;
+        }
       }
       if (desc) {
         processedPhotos.push({
           pose_label: s.pose_label,
           photo_data: s.photo_data,
-          descriptor: desc,
+          descriptor: faceApi.normalizeDescriptor(desc),
         });
       }
     }
 
-    if (processedPhotos.length === 0) {
-      throw new Error('Gagal memproses fitur wajah. Pastikan wajah terlihat jelas di kamera.');
+    if (processedPhotos.length < 3) {
+      throw new Error(`Hanya ${processedPhotos.length} sampel wajah valid yang berhasil diekstraksi. Minimal 3 pose wajah berkualitas tinggi diperlukan.`);
     }
+
+    // Compute normalized centroid vector across all multi-angle samples
+    const centroidDesc = new Float32Array(128);
+    for (const p of processedPhotos) {
+      for (let j = 0; j < 128; j++) {
+        centroidDesc[j] += p.descriptor[j];
+      }
+    }
+    const normalizedCentroid = faceApi.normalizeDescriptor(
+      centroidDesc.map((v) => v / processedPhotos.length)
+    );
+
+    processedPhotos.push({
+      pose_label: 'Centroid (Rata-rata Multi-Sample)',
+      photo_data: processedPhotos[0].photo_data,
+      descriptor: normalizedCentroid,
+    });
 
     const student = await db.saveStudent({
       nis,
@@ -271,7 +343,7 @@ export const api = {
 
     return {
       status: 'SUCCESS',
-      message: `Berhasil mendaftarkan ${student.full_name} ke Supabase Cloud dengan ${processedPhotos.length} sampel wajah.`,
+      message: `Berhasil mendaftarkan ${student.full_name} ke Supabase Cloud dengan ${processedPhotos.length - 1} pose + 1 centroid biometrik.`,
       student_id: student.id,
     };
   },

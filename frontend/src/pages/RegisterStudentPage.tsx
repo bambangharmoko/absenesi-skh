@@ -98,6 +98,7 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
     Record<string, { photo: string; descriptor: Float32Array; pose: string }>
   >({});
   const [liveHeadPose, setLiveHeadPose] = useState<HeadPose | null>(null);
+  const [qualityWarning, setQualityWarning] = useState<string | null>(null);
 
   // Manual fallback photos (4 angles)
   const [manualPhotos, setManualPhotos] = useState<(string | null)[]>([null, null, null, null]);
@@ -199,6 +200,7 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
     setCurrentPromptIndex(0);
     setIsScanningActive(false);
     setLiveHeadPose(null);
+    setQualityWarning(null);
   };
 
   useEffect(() => {
@@ -239,6 +241,13 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
             }
 
             if (isPoseMatched && !capturedSamples[currentTarget.id]) {
+              // Quality Check: Reject blurry, dim, or small face frame before capturing
+              if (detection.quality && !detection.quality.isValid) {
+                setQualityWarning(detection.quality.reason || 'Kualitas gambar kurang tajam. Harap diam sejenak.');
+                return;
+              }
+              setQualityWarning(null);
+
               // Capture high-res snapshot
               canvas.width = video.videoWidth;
               canvas.height = video.videoHeight;
@@ -294,7 +303,7 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
   }, [step, isScanningActive, isCameraActive, currentPromptIndex, capturedSamples, formData.nickname]);
 
   // Fallback Single Manual Capture
-  const handleManualCapture = (idx: number) => {
+  const handleManualCapture = async (idx: number) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -307,6 +316,17 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
+    const det = await faceApi.detectFace(canvas, true);
+    if (!det) {
+      setErrorMsg('Wajah tidak terdeteksi. Posisikan wajah di depan kamera.');
+      return;
+    }
+    if (det.quality && !det.quality.isValid) {
+      setErrorMsg(`Foto ditolak: ${det.quality.reason}`);
+      return;
+    }
+
+    setErrorMsg(null);
     const updated = [...manualPhotos];
     updated[idx] = dataUrl;
     setManualPhotos(updated);
@@ -317,9 +337,20 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      const extracted = await faceApi.extractDescriptorFromDataUrl(dataUrl, { checkQuality: true });
+      if (!extracted) {
+        setErrorMsg('Wajah tidak terdeteksi pada file gambar.');
+        return;
+      }
+      if (extracted.quality && !extracted.quality.isValid) {
+        setErrorMsg(`Foto ditolak: ${extracted.quality.reason}`);
+        return;
+      }
+      setErrorMsg(null);
       const updated = [...manualPhotos];
-      updated[idx] = reader.result as string;
+      updated[idx] = dataUrl;
       setManualPhotos(updated);
     };
     reader.readAsDataURL(file);
@@ -337,13 +368,6 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
     }
 
     try {
-      const data = new FormData();
-      data.append('nis', formData.nis.trim());
-      data.append('full_name', formData.full_name.trim());
-      data.append('nickname', formData.nickname.trim());
-      data.append('class_name', formData.class_name);
-      data.append('category', formData.category.trim() || 'Umum');
-
       if (isFaceIdMode) {
         const samples = Object.values(capturedSamples)
           .filter(s => s.photo)
@@ -353,8 +377,8 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
             descriptor: s.descriptor,
           }));
 
-        if (samples.length === 0) {
-          setErrorMsg('Harap selesaikan pemindaian wajah minimal 1 sampel.');
+        if (samples.length < 3) {
+          setErrorMsg('Pendaftaran biometrik memerlukan minimal 3 pose wajah (Depan, Kiri, Kanan) untuk akurasi tinggi.');
           setStep(2);
           setIsSubmitting(false);
           return;
@@ -370,16 +394,16 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
         });
       } else {
         const validPhotos = manualPhotos.filter(Boolean);
-        if (validPhotos.length === 0) {
-          setErrorMsg('Harap ambil foto minimal 1 sampel.');
+        if (validPhotos.length < 3) {
+          setErrorMsg('Harap sediakan minimal 3 foto wajah dari sudut berbeda.');
           setStep(2);
           setIsSubmitting(false);
           return;
         }
 
         const samples = validPhotos.map((photo, idx) => ({
-          pose_label: `Foto ${idx + 1}`,
-          photo_data: photo,
+          pose_label: POSE_TARGETS[idx]?.label || `Foto ${idx + 1}`,
+          photo_data: photo!,
         }));
 
         await api.enrollStudentDirect({
@@ -717,6 +741,13 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                   </div>
                 </div>
 
+                {qualityWarning && (
+                  <div className="p-2.5 rounded-lg bg-amber-950/50 border border-amber-500/40 text-amber-300 text-xs flex items-center justify-center gap-2 animate-pulse">
+                    <ShieldAlert className="w-4 h-4 flex-shrink-0 text-amber-400" />
+                    <span className="font-medium">{qualityWarning}</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-center gap-2.5">
                   {!isScanningActive ? (
                     <button
@@ -808,8 +839,8 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                 const sampleCount = isFaceIdMode
                   ? Object.keys(capturedSamples).length
                   : manualPhotos.filter(Boolean).length;
-                if (sampleCount === 0) {
-                  setErrorMsg('Harap lakukan pemindaian wajah atau ambil foto minimal 1 pose.');
+                if (sampleCount < 3) {
+                  setErrorMsg('Harap lakukan pemindaian wajah atau ambil foto minimal 3 pose berbeda (Depan, Kiri, Kanan).');
                   return;
                 }
                 setErrorMsg(null);

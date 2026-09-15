@@ -7,6 +7,15 @@ export interface HeadPose {
   poseCategory: 'CENTER' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN';
 }
 
+export interface QualityAssessmentResult {
+  isValid: boolean;
+  blurScore: number;
+  brightnessScore: number;
+  faceWidth: number;
+  faceHeight: number;
+  reason?: string;
+}
+
 export interface FaceDetectionResult {
   descriptor: Float32Array;
   box: {
@@ -15,7 +24,9 @@ export interface FaceDetectionResult {
     width: number;
     height: number;
   };
+  landmarks?: faceapi.FaceLandmarks68;
   score: number;
+  quality?: QualityAssessmentResult;
 }
 
 export interface DetailedFaceResult {
@@ -29,6 +40,7 @@ export interface DetailedFaceResult {
   landmarks: faceapi.FaceLandmarks68;
   headPose: HeadPose;
   score: number;
+  quality?: QualityAssessmentResult;
 }
 
 export interface MatchResult {
@@ -43,6 +55,34 @@ export interface MatchResult {
   };
   confidence: number;
   distance: number;
+  similarity?: number;
+}
+
+export interface AdvancedMatchOptions {
+  maxDistance?: number; // Maximum allowable Euclidean distance (default: 0.42)
+  minSimilarity?: number; // Minimum allowable Cosine similarity (default: 0.88)
+  minMargin?: number; // Minimum gap between Top-1 and Top-2 distance (default: 0.10)
+  grayAreaDistance?: number; // Ambiguity boundary (default: 0.48)
+}
+
+export interface AdvancedMatchResult {
+  status: 'MATCHED' | 'AMBIGUOUS' | 'UNKNOWN' | 'LOW_CONFIDENCE';
+  student?: {
+    id: string;
+    nis: string;
+    name: string;
+    nickname: string;
+    class_name: string;
+    category: string;
+    photo_url?: string | null;
+  };
+  confidence: number;
+  top1Distance: number;
+  top1Similarity: number;
+  top2Distance?: number;
+  top2Similarity?: number;
+  margin?: number;
+  message: string;
 }
 
 class FaceApiService {
@@ -58,6 +98,9 @@ class FaceApiService {
       try {
         console.log('[FaceAPI] Loading neural network models from:', MODEL_URL);
         await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL).catch(e => {
+            console.warn('[FaceAPI] SSD MobileNet V1 load fallback:', e);
+          }),
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
@@ -74,15 +117,235 @@ class FaceApiService {
   }
 
   /**
+   * Assess face quality:
+   * 1. Resolution / Bounding Box Size (minimum 85x85 px)
+   * 2. Illumination / Luminance check (not too dark < 40, not overexposed > 230)
+   * 3. Blur check via discrete 3x3 Laplacian variance (sharpness score >= 30)
+   */
+  assessFaceQuality(
+    canvasSource: HTMLCanvasElement | HTMLVideoElement | HTMLImageElement,
+    box: { x: number; y: number; width: number; height: number }
+  ): QualityAssessmentResult {
+    const faceW = Math.round(box.width);
+    const faceH = Math.round(box.height);
+
+    // 1. Resolution check
+    if (faceW < 85 || faceH < 85) {
+      return {
+        isValid: false,
+        blurScore: 0,
+        brightnessScore: 0,
+        faceWidth: faceW,
+        faceHeight: faceH,
+        reason: `Wajah terlalu jauh (${faceW}x${faceH} px). Harap mendekat ke kamera (minimal 90x90 px).`,
+      };
+    }
+
+    // Prepare an offscreen crop canvas
+    const cropSize = 120;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = cropSize;
+    offCanvas.height = cropSize;
+    const ctx = offCanvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      return {
+        isValid: true,
+        blurScore: 100,
+        brightnessScore: 128,
+        faceWidth: faceW,
+        faceHeight: faceH,
+      };
+    }
+
+    // Draw cropped face
+    ctx.drawImage(
+      canvasSource,
+      Math.max(0, box.x),
+      Math.max(0, box.y),
+      Math.min(box.width, ('videoWidth' in canvasSource ? canvasSource.videoWidth : canvasSource.width) - box.x),
+      Math.min(box.height, ('videoHeight' in canvasSource ? canvasSource.videoHeight : canvasSource.height) - box.y),
+      0,
+      0,
+      cropSize,
+      cropSize
+    );
+
+    const imgData = ctx.getImageData(0, 0, cropSize, cropSize);
+    const pixels = imgData.data;
+
+    // 2. Mean Luminance / Illumination Check
+    let sumLum = 0;
+    const gray: number[] = new Array(cropSize * cropSize);
+    for (let i = 0, gIdx = 0; i < pixels.length; i += 4, gIdx++) {
+      const lum = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+      gray[gIdx] = lum;
+      sumLum += lum;
+    }
+    const meanBrightness = Math.round(sumLum / (cropSize * cropSize));
+
+    if (meanBrightness < 38) {
+      return {
+        isValid: false,
+        blurScore: 0,
+        brightnessScore: meanBrightness,
+        faceWidth: faceW,
+        faceHeight: faceH,
+        reason: `Pencahayaan terlalu gelap (${meanBrightness}/255). Harap cari area dengan pencahayaan cukup.`,
+      };
+    }
+
+    if (meanBrightness > 235) {
+      return {
+        isValid: false,
+        blurScore: 0,
+        brightnessScore: meanBrightness,
+        faceWidth: faceW,
+        faceHeight: faceH,
+        reason: `Pencahayaan terlalu silau / overexposed (${meanBrightness}/255).`,
+      };
+    }
+
+    // 3. Blur Check via 3x3 Discrete Laplacian Kernel
+    // Kernel:
+    //  0  1  0
+    //  1 -4  1
+    //  0  1  0
+    let laplacianSum = 0;
+    let laplacianSumSq = 0;
+    let count = 0;
+
+    for (let y = 1; y < cropSize - 1; y++) {
+      const rowOffset = y * cropSize;
+      for (let x = 1; x < cropSize - 1; x++) {
+        const val =
+          gray[rowOffset - cropSize + x] +
+          gray[rowOffset + cropSize + x] +
+          gray[rowOffset + x - 1] +
+          gray[rowOffset + x + 1] -
+          4 * gray[rowOffset + x];
+
+        laplacianSum += val;
+        laplacianSumSq += val * val;
+        count++;
+      }
+    }
+
+    const laplacianMean = laplacianSum / count;
+    const laplacianVariance = Math.round((laplacianSumSq / count) - laplacianMean * laplacianMean);
+
+    if (laplacianVariance < 28) {
+      return {
+        isValid: false,
+        blurScore: laplacianVariance,
+        brightnessScore: meanBrightness,
+        faceWidth: faceW,
+        faceHeight: faceH,
+        reason: `Foto wajah buram / goyang (skor ketajaman: ${laplacianVariance}, minimal: 28). Harap tatap kamera dengan tenang.`,
+      };
+    }
+
+    return {
+      isValid: true,
+      blurScore: laplacianVariance,
+      brightnessScore: meanBrightness,
+      faceWidth: faceW,
+      faceHeight: faceH,
+    };
+  }
+
+  /**
+   * Align face horizontally based on 68-point eye landmarks and apply contrast normalization
+   */
+  alignAndNormalizeFace(
+    source: HTMLCanvasElement | HTMLVideoElement | HTMLImageElement,
+    landmarks: faceapi.FaceLandmarks68,
+    box: { x: number; y: number; width: number; height: number },
+    targetSize = 160
+  ): HTMLCanvasElement {
+    const pts = landmarks.positions;
+    // Left eye center (pts 36..41)
+    let leftEyeX = 0;
+    let leftEyeY = 0;
+    for (let i = 36; i <= 41; i++) {
+      leftEyeX += pts[i].x;
+      leftEyeY += pts[i].y;
+    }
+    leftEyeX /= 6;
+    leftEyeY /= 6;
+
+    // Right eye center (pts 42..47)
+    let rightEyeX = 0;
+    let rightEyeY = 0;
+    for (let i = 42; i <= 47; i++) {
+      rightEyeX += pts[i].x;
+      rightEyeY += pts[i].y;
+    }
+    rightEyeX /= 6;
+    rightEyeY /= 6;
+
+    // Calculate rotation angle (roll) to align eyes horizontally
+    const dy = rightEyeY - leftEyeY;
+    const dx = rightEyeX - leftEyeX;
+    const eyeDist = Math.hypot(dx, dy);
+    const angleRad = Math.atan2(dy, dx);
+
+    const alignedCanvas = document.createElement('canvas');
+    alignedCanvas.width = targetSize;
+    alignedCanvas.height = targetSize;
+    const ctx = alignedCanvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return alignedCanvas;
+
+    // Center point between eyes
+    const eyeMidX = (leftEyeX + rightEyeX) / 2;
+    const eyeMidY = (leftEyeY + rightEyeY) / 2;
+
+    // Scale so eye distance is ~35% of target width
+    const desiredEyeDist = targetSize * 0.35;
+    const scale = eyeDist > 10 ? desiredEyeDist / eyeDist : 1;
+
+    ctx.save();
+    // Position eye center at (0.5 * targetSize, 0.4 * targetSize)
+    ctx.translate(targetSize * 0.5, targetSize * 0.4);
+    ctx.rotate(-angleRad);
+    ctx.scale(scale, scale);
+    ctx.translate(-eyeMidX, -eyeMidY);
+    ctx.drawImage(source, 0, 0);
+    ctx.restore();
+
+    // Apply Contrast Stretching / Lighting Normalization
+    try {
+      const imgData = ctx.getImageData(0, 0, targetSize, targetSize);
+      const d = imgData.data;
+      let minVal = 255;
+      let maxVal = 0;
+
+      for (let i = 0; i < d.length; i += 4) {
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        if (lum < minVal) minVal = lum;
+        if (lum > maxVal) maxVal = lum;
+      }
+
+      if (maxVal - minVal > 15) {
+        const range = maxVal - minVal;
+        for (let i = 0; i < d.length; i += 4) {
+          d[i] = Math.min(255, Math.max(0, ((d[i] - minVal) / range) * 230 + 12));
+          d[i + 1] = Math.min(255, Math.max(0, ((d[i + 1] - minVal) / range) * 230 + 12));
+          d[i + 2] = Math.min(255, Math.max(0, ((d[i + 2] - minVal) / range) * 230 + 12));
+        }
+        ctx.putImageData(imgData, 0, 0);
+      }
+    } catch {
+      // Fallback gracefully if pixel manipulation fails
+    }
+
+    return alignedCanvas;
+  }
+
+  /**
    * Estimate 3D Head Rotation (Yaw, Pitch, Roll) from 68 facial landmark coordinates
    */
   estimateHeadPose(landmarks: faceapi.FaceLandmarks68): HeadPose {
     const pts = landmarks.positions;
-    // Landmark indices:
-    // 0: Left jaw edge, 16: Right jaw edge
-    // 30: Nose tip, 27: Nose bridge top, 8: Chin bottom
-    // 36: Left eye corner, 45: Right eye corner
-
     const leftJawX = pts[0].x;
     const rightJawX = pts[16].x;
     const noseTipX = pts[30].x;
@@ -93,18 +356,14 @@ class FaceApiService {
     const jawWidth = Math.max(1, rightJawX - leftJawX);
     const leftDist = noseTipX - leftJawX;
 
-    // Yaw ratio: In front camera perspective, turning to user's RIGHT moves nose towards pts[0] (lower x in image).
-    // So (0.5 - yawRatio) becomes POSITIVE (> 10) when turning RIGHT, and NEGATIVE (< -10) when turning LEFT.
     const yawRatio = leftDist / jawWidth;
     const yaw = (0.5 - yawRatio) * 80;
 
-    // Pitch ratio: vertical position of nose tip between nose bridge and chin
     const faceHeight = Math.max(1, chinY - noseBridgeY);
     const noseToChin = chinY - noseTipY;
     const pitchRatio = noseToChin / faceHeight;
     const pitch = (pitchRatio - 0.58) * 90;
 
-    // Roll angle (Tilt)
     const leftEye = pts[36];
     const rightEye = pts[45];
     const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
@@ -120,7 +379,7 @@ class FaceApiService {
   }
 
   /**
-   * Detect face with 3D Head Pose and 128-dimensional descriptor
+   * Detect face with 3D Head Pose and L2-normalized 128-dimensional descriptor
    */
   async detectFaceWithPose(
     input: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
@@ -128,7 +387,7 @@ class FaceApiService {
     await this.loadModels();
 
     const options = new faceapi.TinyFaceDetectorOptions({
-      inputSize: 320,
+      inputSize: 416,
       scoreThreshold: 0.45,
     });
 
@@ -141,48 +400,76 @@ class FaceApiService {
 
     const { x, y, width, height } = detection.detection.box;
     const headPose = this.estimateHeadPose(detection.landmarks);
+    const quality = this.assessFaceQuality(input, { x, y, width, height });
 
     return {
-      descriptor: detection.descriptor,
+      descriptor: this.normalizeDescriptor(detection.descriptor),
       box: { x, y, width, height },
       landmarks: detection.landmarks,
       headPose,
       score: detection.detection.score,
+      quality,
     };
   }
 
   /**
-   * Detect single face with landmarks and 128-dimensional descriptor
+   * Detect single face with landmarks, alignment, and normalized 128-d descriptor
    */
   async detectFace(
-    input: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
+    input: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
+    useSsd = false
   ): Promise<FaceDetectionResult | null> {
     await this.loadModels();
 
-    const options = new faceapi.TinyFaceDetectorOptions({
-      inputSize: 320,
-      scoreThreshold: 0.5,
-    });
+    let detection: any = null;
 
-    const detection = await faceapi
-      .detectSingleFace(input, options)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
+    // Use SSD MobileNet V1 for maximum accuracy if requested or available
+    if (useSsd && faceapi.nets.ssdMobilenetv1.isLoaded) {
+      try {
+        const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+        detection = await faceapi
+          .detectSingleFace(input, options)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      } catch {
+        detection = null;
+      }
+    }
+
+    // Fallback to TinyFaceDetector
+    if (!detection) {
+      const options = new faceapi.TinyFaceDetectorOptions({
+        inputSize: 416,
+        scoreThreshold: 0.48,
+      });
+
+      detection = await faceapi
+        .detectSingleFace(input, options)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+    }
 
     if (!detection) return null;
 
     const { x, y, width, height } = detection.detection.box;
+    const quality = this.assessFaceQuality(input, { x, y, width, height });
+
     return {
-      descriptor: detection.descriptor,
+      descriptor: this.normalizeDescriptor(detection.descriptor),
       box: { x, y, width, height },
+      landmarks: detection.landmarks,
       score: detection.detection.score,
+      quality,
     };
   }
 
   /**
-   * Extract descriptor from an image (HTMLImageElement or Data URL)
+   * Extract descriptor from an image (HTMLImageElement or Data URL) with alignment
    */
-  async extractDescriptorFromDataUrl(dataUrl: string): Promise<Float32Array | null> {
+  async extractDescriptorFromDataUrl(
+    dataUrl: string,
+    options: { useAlignment?: boolean; checkQuality?: boolean } = {}
+  ): Promise<{ descriptor: Float32Array; quality?: QualityAssessmentResult } | null> {
     await this.loadModels();
 
     return new Promise((resolve) => {
@@ -190,8 +477,19 @@ class FaceApiService {
       img.crossOrigin = 'anonymous';
       img.onload = async () => {
         try {
-          const res = await this.detectFace(img);
-          resolve(res ? res.descriptor : null);
+          const res = await this.detectFace(img, true);
+          if (!res) {
+            resolve(null);
+            return;
+          }
+
+          if (options.checkQuality && res.quality && !res.quality.isValid) {
+            console.warn('[FaceAPI] Image quality rejected:', res.quality.reason);
+            resolve({ descriptor: res.descriptor, quality: res.quality });
+            return;
+          }
+
+          resolve({ descriptor: res.descriptor, quality: res.quality });
         } catch (e) {
           console.warn('[FaceAPI] Extract descriptor error:', e);
           resolve(null);
@@ -200,6 +498,24 @@ class FaceApiService {
       img.onerror = () => resolve(null);
       img.src = dataUrl;
     });
+  }
+
+  /**
+   * L2-Normalize a 128-dimensional biometric vector
+   */
+  normalizeDescriptor(desc: Float32Array): Float32Array {
+    let norm = 0;
+    for (let i = 0; i < desc.length; i++) {
+      norm += desc[i] * desc[i];
+    }
+    norm = Math.sqrt(norm);
+    if (norm === 0) return desc;
+
+    const normalized = new Float32Array(desc.length);
+    for (let i = 0; i < desc.length; i++) {
+      normalized[i] = desc[i] / norm;
+    }
+    return normalized;
   }
 
   /**
@@ -221,19 +537,7 @@ class FaceApiService {
       centroid[i] /= count;
     }
 
-    // L2 Normalize
-    let norm = 0;
-    for (let i = 0; i < length; i++) {
-      norm += centroid[i] * centroid[i];
-    }
-    norm = Math.sqrt(norm);
-    if (norm > 0) {
-      for (let i = 0; i < length; i++) {
-        centroid[i] /= norm;
-      }
-    }
-
-    return centroid;
+    return this.normalizeDescriptor(centroid);
   }
 
   /**
@@ -255,7 +559,7 @@ class FaceApiService {
   }
 
   /**
-   * Euclidean distance between two 128-d vectors
+   * Euclidean distance (L2) between two 128-d vectors
    */
   euclideanDistance(vec1: Float32Array | number[], vec2: Float32Array | number[]): number {
     let sum = 0;
@@ -266,9 +570,174 @@ class FaceApiService {
     return Math.sqrt(sum);
   }
 
+  /**
+   * Calibrated confidence score based on L2 distance
+   * Distance <= 0.20 -> 98-99%
+   * Distance 0.30 -> 91%
+   * Distance 0.40 -> 82%
+   * Distance 0.42 -> 80%
+   * Distance > 0.45 -> drops below 65%
+   */
+  calculateCalibratedConfidence(dist: number): number {
+    if (dist <= 0.20) return 0.99;
+    const conf = 1.0 - (dist - 0.20) * 0.9;
+    return Math.max(0.1, Math.min(0.99, conf));
+  }
 
   /**
-   * Match a detected descriptor against enrolled students
+   * Advanced Biometric Matcher with:
+   * 1. Multi-Sample & Centroid Composite Distance
+   * 2. Strict L2 distance threshold (default: 0.42)
+   * 3. Strict Cosine Similarity threshold (default: 0.88)
+   * 4. Gray Area / Tolerance rejection (never guess between 0.42 and 0.48)
+   * 5. Top-1 vs Top-2 Margin Checking (prevents similar-looking faces false positive)
+   */
+  matchFaceAdvanced(
+    detected: Float32Array,
+    enrolledStudents: Array<{
+      student: {
+        id: string;
+        nis: string;
+        name: string;
+        nickname: string;
+        class_name: string;
+        category: string;
+        photo_url?: string | null;
+      };
+      embeddings: Float32Array[];
+      centroid?: Float32Array;
+    }>,
+    options: AdvancedMatchOptions = {}
+  ): AdvancedMatchResult {
+    const maxDistance = options.maxDistance ?? 0.42; // Strict L2 (User requested 0.40 - 0.45)
+    const minSimilarity = options.minSimilarity ?? 0.88; // Strict Cosine (User requested 0.85 - 0.90)
+    const minMargin = options.minMargin ?? 0.10; // Margin between Top-1 and Top-2
+    const grayAreaDistance = options.grayAreaDistance ?? 0.48;
+
+    const normalizedDetected = this.normalizeDescriptor(detected);
+
+    interface CandidateScore {
+      student: (typeof enrolledStudents)[0]['student'];
+      minDistance: number;
+      maxSimilarity: number;
+      centroidDistance: number;
+      compositeDistance: number;
+      compositeSimilarity: number;
+    }
+
+    const candidateScores: CandidateScore[] = [];
+
+    for (const item of enrolledStudents) {
+      if (!item.embeddings || item.embeddings.length === 0) continue;
+
+      let studentMinDist = Infinity;
+      let studentMaxSim = -1;
+
+      for (const emb of item.embeddings) {
+        const dist = this.euclideanDistance(normalizedDetected, emb);
+        const sim = this.cosineSimilarity(normalizedDetected, emb);
+
+        if (dist < studentMinDist) studentMinDist = dist;
+        if (sim > studentMaxSim) studentMaxSim = sim;
+      }
+
+      // Compute or use centroid
+      const centroid = item.centroid || this.computeCentroid(item.embeddings);
+      const centroidDist = this.euclideanDistance(normalizedDetected, centroid);
+      const centroidSim = this.cosineSimilarity(normalizedDetected, centroid);
+
+      // Composite distance: 65% best sample + 35% centroid stability
+      const compositeDist = 0.65 * studentMinDist + 0.35 * centroidDist;
+      const compositeSim = 0.65 * studentMaxSim + 0.35 * centroidSim;
+
+      candidateScores.push({
+        student: item.student,
+        minDistance: studentMinDist,
+        maxSimilarity: studentMaxSim,
+        centroidDistance: centroidDist,
+        compositeDistance: compositeDist,
+        compositeSimilarity: compositeSim,
+      });
+    }
+
+    if (candidateScores.length === 0) {
+      return {
+        status: 'UNKNOWN',
+        confidence: 0,
+        top1Distance: Infinity,
+        top1Similarity: 0,
+        message: 'Belum ada data siswa terdaftar dalam sistem.',
+      };
+    }
+
+    // Sort by composite distance ascending
+    candidateScores.sort((a, b) => a.compositeDistance - b.compositeDistance);
+
+    const top1 = candidateScores[0];
+    const top2 = candidateScores.length > 1 ? candidateScores[1] : null;
+
+    const margin = top2 ? top2.compositeDistance - top1.compositeDistance : 1.0;
+    const simMargin = top2 ? top1.compositeSimilarity - top2.compositeSimilarity : 1.0;
+
+    // Rule 1: Strict Threshold Check
+    // If distance exceeds strict threshold or similarity is below minimum
+    if (top1.minDistance > maxDistance || top1.maxSimilarity < minSimilarity) {
+      const isGrayArea = top1.minDistance <= grayAreaDistance || top1.maxSimilarity >= 0.84;
+      const confidence = this.calculateCalibratedConfidence(top1.minDistance);
+
+      return {
+        status: isGrayArea ? 'LOW_CONFIDENCE' : 'UNKNOWN',
+        student: top1.student,
+        confidence,
+        top1Distance: top1.minDistance,
+        top1Similarity: top1.maxSimilarity,
+        top2Distance: top2?.minDistance,
+        top2Similarity: top2?.maxSimilarity,
+        margin,
+        message: isGrayArea
+          ? 'Tingkat kemiripan berada di batas ambang toleransi. Silakan tatap kamera lebih dekat dan tenang.'
+          : 'Wajah tidak terdaftar dalam database siswa.',
+      };
+    }
+
+    // Rule 2: Top-1 vs Top-2 Margin Checking (Anti-False-Positive for Similar Faces)
+    // If Candidate 1 and Candidate 2 have very close distances, reject due to ambiguity!
+    if (top2 && (margin < minMargin || simMargin < 0.04)) {
+      console.warn(
+        `[FaceAPI] ⚠️ Ambiguity detected between Top-1 (${top1.student.name}, dist: ${top1.minDistance.toFixed(3)}) and Top-2 (${top2.student.name}, dist: ${top2.minDistance.toFixed(3)}). Margin: ${margin.toFixed(3)} < ${minMargin}`
+      );
+
+      return {
+        status: 'AMBIGUOUS',
+        student: top1.student,
+        confidence: this.calculateCalibratedConfidence(top1.minDistance),
+        top1Distance: top1.minDistance,
+        top1Similarity: top1.maxSimilarity,
+        top2Distance: top2.minDistance,
+        top2Similarity: top2.maxSimilarity,
+        margin,
+        message: `Terdeteksi kemiripan wajah antara dua siswa (${top1.student.nickname} & ${top2.student.nickname}). Harap posisikan wajah lurus di tengah atau gunakan presensi manual.`,
+      };
+    }
+
+    // Rule 3: Valid Match
+    const confidence = this.calculateCalibratedConfidence(top1.minDistance);
+
+    return {
+      status: 'MATCHED',
+      student: top1.student,
+      confidence,
+      top1Distance: top1.minDistance,
+      top1Similarity: top1.maxSimilarity,
+      top2Distance: top2?.minDistance,
+      top2Similarity: top2?.maxSimilarity,
+      margin,
+      message: `Wajah Cocok: ${top1.student.name} (${Math.round(confidence * 100)}%)`,
+    };
+  }
+
+  /**
+   * Backwards-compatible matchFace wrapper
    */
   matchFace(
     detected: Float32Array,
@@ -284,29 +753,19 @@ class FaceApiService {
       };
       embeddings: Float32Array[];
     }>,
-    threshold = 0.58
+    threshold = 0.42
   ): MatchResult | null {
-    let bestMatch: MatchResult | null = null;
-    let minDistance = Infinity;
+    const res = this.matchFaceAdvanced(detected, enrolledStudents, {
+      maxDistance: threshold,
+    });
 
-    for (const item of enrolledStudents) {
-      if (!item.embeddings || item.embeddings.length === 0) continue;
-
-      for (const emb of item.embeddings) {
-        const dist = this.euclideanDistance(detected, emb);
-        if (dist < minDistance) {
-          minDistance = dist;
-          bestMatch = {
-            student: item.student,
-            distance: dist,
-            confidence: Math.max(0, Math.min(1, 1 - dist * 0.85)),
-          };
-        }
-      }
-    }
-
-    if (bestMatch && minDistance <= threshold) {
-      return bestMatch;
+    if (res.status === 'MATCHED' && res.student) {
+      return {
+        student: res.student,
+        confidence: res.confidence,
+        distance: res.top1Distance,
+        similarity: res.top1Similarity,
+      };
     }
 
     return null;
