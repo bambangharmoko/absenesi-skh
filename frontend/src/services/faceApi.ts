@@ -183,7 +183,8 @@ class FaceApiService {
     }
     const meanBrightness = Math.round(sumLum / (cropSize * cropSize));
 
-    if (meanBrightness < 38) {
+    // Allow down to 22 (handled by Software IR preprocessor)
+    if (meanBrightness < 22) {
       return {
         isValid: false,
         blurScore: 0,
@@ -194,7 +195,7 @@ class FaceApiService {
       };
     }
 
-    if (meanBrightness > 235) {
+    if (meanBrightness > 240) {
       return {
         isValid: false,
         blurScore: 0,
@@ -205,11 +206,19 @@ class FaceApiService {
       };
     }
 
-    // 3. Blur Check via 3x3 Discrete Laplacian Kernel
-    // Kernel:
-    //  0  1  0
-    //  1 -4  1
-    //  0  1  0
+    // 3. Blur Check via 3x3 Discrete Laplacian Kernel with Gaussian Noise Filter
+    // Pre-smooth image to eliminate camera sensor grain (ISO noise)
+    const smoothed = new Float32Array(cropSize * cropSize);
+    for (let y = 1; y < cropSize - 1; y++) {
+      const rowOffset = y * cropSize;
+      for (let x = 1; x < cropSize - 1; x++) {
+        smoothed[rowOffset + x] =
+          (gray[rowOffset - cropSize + x - 1] + 2 * gray[rowOffset - cropSize + x] + gray[rowOffset - cropSize + x + 1] +
+           2 * gray[rowOffset + x - 1] + 4 * gray[rowOffset + x] + 2 * gray[rowOffset + x + 1] +
+           gray[rowOffset + cropSize + x - 1] + 2 * gray[rowOffset + cropSize + x] + gray[rowOffset + cropSize + x + 1]) / 16;
+      }
+    }
+
     let laplacianSum = 0;
     let laplacianSumSq = 0;
     let count = 0;
@@ -218,11 +227,11 @@ class FaceApiService {
       const rowOffset = y * cropSize;
       for (let x = 1; x < cropSize - 1; x++) {
         const val =
-          gray[rowOffset - cropSize + x] +
-          gray[rowOffset + cropSize + x] +
-          gray[rowOffset + x - 1] +
-          gray[rowOffset + x + 1] -
-          4 * gray[rowOffset + x];
+          smoothed[rowOffset - cropSize + x] +
+          smoothed[rowOffset + cropSize + x] +
+          smoothed[rowOffset + x - 1] +
+          smoothed[rowOffset + x + 1] -
+          4 * smoothed[rowOffset + x];
 
         laplacianSum += val;
         laplacianSumSq += val * val;
@@ -233,14 +242,15 @@ class FaceApiService {
     const laplacianMean = laplacianSum / count;
     const laplacianVariance = Math.round((laplacianSumSq / count) - laplacianMean * laplacianMean);
 
-    if (laplacianVariance < 28) {
+    // True structural facial blur check (isolated from sensor noise)
+    if (laplacianVariance < 16) {
       return {
         isValid: false,
         blurScore: laplacianVariance,
         brightnessScore: meanBrightness,
         faceWidth: faceW,
         faceHeight: faceH,
-        reason: `Foto wajah buram / goyang (skor ketajaman: ${laplacianVariance}, minimal: 28). Harap tatap kamera dengan tenang.`,
+        reason: `Foto wajah buram / goyang (skor ketajaman: ${laplacianVariance}, minimal: 16). Harap tatap kamera dengan tenang.`,
       };
     }
 
@@ -251,6 +261,84 @@ class FaceApiService {
       faceWidth: faceW,
       faceHeight: faceH,
     };
+  }
+
+  /**
+   * Software IR & Camera Noise Suppression Preprocessor:
+   * 1. Evaluates illumination & sensor noise
+   * 2. If underexposed (dark < 105) or noisy:
+   *    - Applies adaptive Gamma correction: V_out = 255 * (V_in/255)^gamma
+   *    - Applies 3x3 local Gaussian noise reduction on luminance
+   *    - Performs dynamic range expansion so facial edges & landmarks emerge from darkness/grain
+   */
+  preprocessSoftwareIR(
+    source: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
+    forceEnhance = false
+  ): { canvas: HTMLCanvasElement; wasEnhanced: boolean; brightness: number } {
+    const w = 'videoWidth' in source ? source.videoWidth : source.width;
+    const h = 'videoHeight' in source ? source.videoHeight : source.height;
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = w || 640;
+    outCanvas.height = h || 480;
+    const ctx = outCanvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      return { canvas: outCanvas, wasEnhanced: false, brightness: 128 };
+    }
+
+    ctx.drawImage(source, 0, 0, outCanvas.width, outCanvas.height);
+    const imgData = ctx.getImageData(0, 0, outCanvas.width, outCanvas.height);
+    const d = imgData.data;
+
+    let sumLum = 0;
+    const sampleStep = 4;
+    let samples = 0;
+    for (let i = 0; i < d.length; i += 4 * sampleStep) {
+      sumLum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      samples++;
+    }
+    const meanBrightness = Math.round(sumLum / Math.max(1, samples));
+
+    if (!forceEnhance && meanBrightness >= 105) {
+      return { canvas: outCanvas, wasEnhanced: false, brightness: meanBrightness };
+    }
+
+    // Adaptive Gamma Compensation
+    const target = 130;
+    const currentNorm = Math.max(15, meanBrightness) / 255;
+    const gamma = Math.min(1.0, Math.max(0.35, Math.log(target / 255) / Math.log(currentNorm)));
+
+    const lut = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+      lut[i] = Math.min(255, Math.max(0, Math.round(255 * Math.pow(i / 255, gamma))));
+    }
+
+    let minVal = 255;
+    let maxVal = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = lut[d[i]];
+      const g = lut[d[i + 1]];
+      const b = lut[d[i + 2]];
+      d[i] = r;
+      d[i + 1] = g;
+      d[i + 2] = b;
+
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum < minVal) minVal = lum;
+      if (lum > maxVal) maxVal = lum;
+    }
+
+    const range = maxVal - minVal;
+    if (range > 20 && range < 220) {
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.min(255, Math.max(0, Math.round(((d[i] - minVal) / range) * 255)));
+        d[i + 1] = Math.min(255, Math.max(0, Math.round(((d[i + 1] - minVal) / range) * 255)));
+        d[i + 2] = Math.min(255, Math.max(0, Math.round(((d[i + 2] - minVal) / range) * 255)));
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    return { canvas: outCanvas, wasEnhanced: true, brightness: meanBrightness };
   }
 
   /**
@@ -343,43 +431,74 @@ class FaceApiService {
 
   /**
    * Estimate 3D Head Rotation (Yaw, Pitch, Roll) from 68 facial landmark coordinates
+   * Uses anthropometric 3D projection ratios:
+   * - Roll: Eye-to-eye horizontal tilt
+   * - Yaw: Nose tip displacement relative to face symmetry axis
+   * - Pitch: Upper-face (eye-to-nose) vs Total vertical face perspective foreshortening
    */
   estimateHeadPose(landmarks: faceapi.FaceLandmarks68): HeadPose {
     const pts = landmarks.positions;
-    const leftJawX = pts[0].x;
-    const rightJawX = pts[16].x;
-    const noseTipX = pts[30].x;
-    const noseTipY = pts[30].y;
-    const chinY = pts[8].y;
-    const noseBridgeY = pts[27].y;
 
-    const jawWidth = Math.max(1, rightJawX - leftJawX);
-    const leftDist = noseTipX - leftJawX;
-
-    const yawRatio = leftDist / jawWidth;
-    const yaw = (0.5 - yawRatio) * 80;
-
-    const faceHeight = Math.max(1, chinY - noseBridgeY);
-    const noseToChin = chinY - noseTipY;
-    const pitchRatio = noseToChin / faceHeight;
-    const pitch = (pitchRatio - 0.58) * 90;
-
+    // 1. Roll: Angle between outer eye corners (36 & 45)
     const leftEye = pts[36];
     const rightEye = pts[45];
     const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * (180 / Math.PI);
 
+    // 2. Center of eyes (midpoint between 36 and 45)
+    const eyeMidX = (pts[36].x + pts[45].x) / 2;
+    const eyeMidY = (pts[36].y + pts[45].y) / 2;
+
+    // 3. Nose root (27), Nose tip (30), Chin tip (8)
+    const noseTipX = pts[30].x;
+    const noseTipY = pts[30].y;
+    const chinY = pts[8].y;
+
+    // 4. Yaw: Horizontal head turn
+    const leftJawX = pts[0].x;
+    const rightJawX = pts[16].x;
+    const jawWidth = Math.max(1, rightJawX - leftJawX);
+    const jawCenter = (leftJawX + rightJawX) / 2;
+
+    const noseOffsetFromCenter = noseTipX - jawCenter;
+    const normalizedYawOffset = noseOffsetFromCenter / (jawWidth * 0.5);
+    // Positive when user turns right (from their perspective), negative when left
+    const yaw = -normalizedYawOffset * 50;
+
+    // 5. Pitch: Vertical head nod (UP vs DOWN)
+    // Key biological perspective ratio:
+    // In frontal neutral gaze: dist(eyeMid, noseTip) is ~41% of total vertical face distance dist(eyeMid, chin).
+    const distEyeNose = Math.max(1, noseTipY - eyeMidY);
+    const totalVerticalSpan = Math.max(1, chinY - eyeMidY);
+    const upperRatio = distEyeNose / totalVerticalSpan;
+
+    // When tilting UP:
+    // Nose tip moves UP towards eyes -> distEyeNose shrinks -> upperRatio drops below 0.32
+    // When tilting DOWN:
+    // Forehead moves forward, chin retreats -> distEyeNose expands -> upperRatio rises above 0.50
+    const baselineUpperRatio = 0.41;
+    const pitch = (baselineUpperRatio - upperRatio) * 110;
+
     let poseCategory: 'CENTER' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN' = 'CENTER';
-    if (yaw > 10) poseCategory = 'RIGHT';
-    else if (yaw < -10) poseCategory = 'LEFT';
-    else if (pitch > 8) poseCategory = 'UP';
-    else if (pitch < -8) poseCategory = 'DOWN';
-    else poseCategory = 'CENTER';
+
+    if (yaw > 12) {
+      poseCategory = 'RIGHT';
+    } else if (yaw < -12) {
+      poseCategory = 'LEFT';
+    } else if (pitch > 11 && upperRatio < 0.33) {
+      // Must have actual upward pitch AND compressed eye-nose distance
+      poseCategory = 'UP';
+    } else if (pitch < -11 && upperRatio > 0.49) {
+      poseCategory = 'DOWN';
+    } else {
+      poseCategory = 'CENTER';
+    }
 
     return { yaw, pitch, roll, poseCategory };
   }
 
   /**
    * Detect face with 3D Head Pose and L2-normalized 128-dimensional descriptor
+   * Includes Software IR Low-Light / Camera Noise Fallback Pass
    */
   async detectFaceWithPose(
     input: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
@@ -391,10 +510,25 @@ class FaceApiService {
       scoreThreshold: 0.45,
     });
 
-    const detection = await faceapi
+    let detection = await faceapi
       .detectSingleFace(input, options)
       .withFaceLandmarks()
       .withFaceDescriptor();
+
+    // Fallback: If not detected due to low-light or noise, run on Software-IR enhanced frame!
+    if (!detection) {
+      const { canvas: irCanvas, wasEnhanced } = this.preprocessSoftwareIR(input);
+      if (wasEnhanced) {
+        const fallbackOptions = new faceapi.TinyFaceDetectorOptions({
+          inputSize: 320,
+          scoreThreshold: 0.38,
+        });
+        detection = await faceapi
+          .detectSingleFace(irCanvas, fallbackOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      }
+    }
 
     if (!detection) return null;
 
@@ -414,6 +548,7 @@ class FaceApiService {
 
   /**
    * Detect single face with landmarks, alignment, and normalized 128-d descriptor
+   * Includes Software IR Low-Light / Camera Noise Fallback Pass
    */
   async detectFace(
     input: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
@@ -426,7 +561,7 @@ class FaceApiService {
     // Use SSD MobileNet V1 for maximum accuracy if requested or available
     if (useSsd && faceapi.nets.ssdMobilenetv1.isLoaded) {
       try {
-        const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+        const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 });
         detection = await faceapi
           .detectSingleFace(input, options)
           .withFaceLandmarks()
@@ -440,13 +575,28 @@ class FaceApiService {
     if (!detection) {
       const options = new faceapi.TinyFaceDetectorOptions({
         inputSize: 416,
-        scoreThreshold: 0.48,
+        scoreThreshold: 0.42,
       });
 
       detection = await faceapi
         .detectSingleFace(input, options)
         .withFaceLandmarks()
         .withFaceDescriptor();
+    }
+
+    // Secondary Fallback: Software IR Enhancement for low-light / noisy sensor conditions
+    if (!detection) {
+      const { canvas: irCanvas, wasEnhanced } = this.preprocessSoftwareIR(input);
+      if (wasEnhanced) {
+        const lowLightOptions = new faceapi.TinyFaceDetectorOptions({
+          inputSize: 320,
+          scoreThreshold: 0.35,
+        });
+        detection = await faceapi
+          .detectSingleFace(irCanvas, lowLightOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      }
     }
 
     if (!detection) return null;

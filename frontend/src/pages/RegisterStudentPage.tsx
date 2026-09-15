@@ -109,6 +109,8 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
   // Webcam references
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const meshCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const poseStabilityRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
 
@@ -137,6 +139,11 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
       try {
         videoRef.current.pause();
       } catch (e) {}
+    }
+    poseStabilityRef.current = 0;
+    if (meshCanvasRef.current) {
+      const ctx = meshCanvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, meshCanvasRef.current.width, meshCanvasRef.current.height);
     }
     setIsCameraActive(false);
   }, []);
@@ -195,6 +202,11 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
   };
 
   const handleResetScan = () => {
+    poseStabilityRef.current = 0;
+    if (meshCanvasRef.current) {
+      const ctx = meshCanvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, meshCanvasRef.current.width, meshCanvasRef.current.height);
+    }
     setCapturedSamples({});
     setScanProgress(0);
     setCurrentPromptIndex(0);
@@ -202,6 +214,81 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
     setLiveHeadPose(null);
     setQualityWarning(null);
   };
+
+  // 3D Holographic Face ID Mesh & Infrared Landmark Constellation
+  const draw3dFaceMesh = useCallback((landmarks: { positions: Array<{ x: number; y: number }> } | null, isMatched: boolean) => {
+    const canvas = meshCanvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!landmarks || !isScanningActive) return;
+
+    const pts = landmarks.positions;
+    const nodeColor = isMatched ? '#10b981' : '#38bdf8';
+    const lineColor = isMatched ? 'rgba(16, 185, 129, 0.45)' : 'rgba(56, 189, 248, 0.22)';
+
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = lineColor;
+
+    const drawPath = (indices: number[], close = false) => {
+      if (indices.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(pts[indices[0]].x, pts[indices[0]].y);
+      for (let i = 1; i < indices.length; i++) {
+        ctx.lineTo(pts[indices[i]].x, pts[indices[i]].y);
+      }
+      if (close) ctx.closePath();
+      ctx.stroke();
+    };
+
+    // 1. Jawline contour (0 to 16)
+    drawPath(Array.from({ length: 17 }, (_, i) => i));
+
+    // 2. Eyebrows
+    drawPath([17, 18, 19, 20, 21]);
+    drawPath([22, 23, 24, 25, 26]);
+
+    // 3. Nose Bridge & Base
+    drawPath([27, 28, 29, 30]);
+    drawPath([31, 32, 33, 34, 35, 30]);
+
+    // 4. Eyes (Outer contours)
+    drawPath([36, 37, 38, 39, 40, 41], true);
+    drawPath([42, 43, 44, 45, 46, 47], true);
+
+    // 5. Lips (Outer & Inner)
+    drawPath([48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], true);
+    drawPath([60, 61, 62, 63, 64, 65, 66, 67], true);
+
+    // 6. 3D Depth Triangulation Cross-Links
+    ctx.beginPath();
+    ctx.moveTo(pts[27].x, pts[27].y);
+    ctx.lineTo(pts[36].x, pts[36].y);
+    ctx.moveTo(pts[27].x, pts[27].y);
+    ctx.lineTo(pts[45].x, pts[45].y);
+    ctx.moveTo(pts[30].x, pts[30].y);
+    ctx.lineTo(pts[48].x, pts[48].y);
+    ctx.moveTo(pts[30].x, pts[30].y);
+    ctx.lineTo(pts[54].x, pts[54].y);
+    ctx.stroke();
+
+    // 7. Glowing Holographic 3D Mesh Nodes (Face ID Infrared Dot Projector Effect)
+    ctx.fillStyle = nodeColor;
+    for (let i = 0; i < pts.length; i++) {
+      ctx.beginPath();
+      ctx.arc(pts[i].x, pts[i].y, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, [isScanningActive]);
 
   useEffect(() => {
     if (step !== 2 || !isScanningActive || !isCameraActive) return;
@@ -222,85 +309,102 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
         const detection = await faceApi.detectFaceWithPose(video);
 
         if (detection) {
-          const { headPose, descriptor } = detection;
+          const { headPose, descriptor, landmarks } = detection;
           setLiveHeadPose(headPose);
 
           // Check if current target pose matches
           const currentTarget = POSE_TARGETS[currentPromptIndex];
-          if (currentTarget) {
-            let isPoseMatched = false;
+          let isPoseMatched = false;
 
+          if (currentTarget) {
             if (currentTarget.id === 'CENTER' && headPose.poseCategory === 'CENTER') {
               isPoseMatched = true;
-            } else if (currentTarget.id === 'RIGHT' && (headPose.poseCategory === 'RIGHT' || headPose.yaw > 10)) {
+            } else if (currentTarget.id === 'RIGHT' && (headPose.poseCategory === 'RIGHT' || headPose.yaw > 12)) {
               isPoseMatched = true;
-            } else if (currentTarget.id === 'LEFT' && (headPose.poseCategory === 'LEFT' || headPose.yaw < -10)) {
+            } else if (currentTarget.id === 'LEFT' && (headPose.poseCategory === 'LEFT' || headPose.yaw < -12)) {
               isPoseMatched = true;
-            } else if (currentTarget.id === 'UP' && (headPose.poseCategory === 'UP' || headPose.pitch > 8)) {
+            } else if (currentTarget.id === 'UP' && headPose.poseCategory === 'UP') {
+              // Strictly require genuine upward pitch from anatomical ratio!
               isPoseMatched = true;
-            }
-
-            if (isPoseMatched && !capturedSamples[currentTarget.id]) {
-              // Quality Check: Reject blurry, dim, or small face frame before capturing
-              if (detection.quality && !detection.quality.isValid) {
-                setQualityWarning(detection.quality.reason || 'Kualitas gambar kurang tajam. Harap diam sejenak.');
-                return;
-              }
-              setQualityWarning(null);
-
-              // Capture high-res snapshot
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              const cctx = canvas.getContext('2d');
-              let photoData = '';
-              if (cctx) {
-                cctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                photoData = canvas.toDataURL('image/jpeg', 0.9);
-              }
-
-              const newSamples = {
-                ...capturedSamples,
-                [currentTarget.id]: {
-                  photo: photoData,
-                  descriptor: descriptor,
-                  pose: currentTarget.label,
-                },
-              };
-
-              setCapturedSamples(newSamples);
-              audioFeedback.playCelebrationChime();
-
-              const completedCount = Object.keys(newSamples).length;
-              const newProgress = Math.round((completedCount / POSE_TARGETS.length) * 100);
-              setScanProgress(newProgress);
-
-              if (completedCount < POSE_TARGETS.length) {
-                const nextIdx = currentPromptIndex + 1;
-                setCurrentPromptIndex(nextIdx);
-                const nextTarget = POSE_TARGETS[nextIdx];
-                audioFeedback.speakText(nextTarget.instruction);
-              } else {
-                // All 4 poses captured!
-                setIsScanningActive(false);
-                confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
-                audioFeedback.speakText(
-                  `Hebat sekali! Pemindaian wajah telah selesai. Data wajah ${formData.nickname || 'siswa'} siap didaftarkan.`
-                );
-                // Auto proceed to review after 1.2s
-                setTimeout(() => setStep(3), 1200);
-              }
             }
           }
+
+          // Draw real-time 3D landmark mesh
+          draw3dFaceMesh(landmarks, isPoseMatched);
+
+          if (isPoseMatched && currentTarget && !capturedSamples[currentTarget.id]) {
+            // Temporal Stability Guard: Require student to hold pose steadily for 3 cycles (~350ms)
+            poseStabilityRef.current++;
+            if (poseStabilityRef.current < 3) {
+              return;
+            }
+
+            // Quality Check: Reject blurry, dim, or small face frame before capturing
+            if (detection.quality && !detection.quality.isValid) {
+              setQualityWarning(detection.quality.reason || 'Kualitas gambar kurang tajam. Harap diam sejenak.');
+              return;
+            }
+            setQualityWarning(null);
+            poseStabilityRef.current = 0;
+
+            // Capture high-res snapshot
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const cctx = canvas.getContext('2d');
+            let photoData = '';
+            if (cctx) {
+              cctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              photoData = canvas.toDataURL('image/jpeg', 0.9);
+            }
+
+            const newSamples = {
+              ...capturedSamples,
+              [currentTarget.id]: {
+                photo: photoData,
+                descriptor: descriptor,
+                pose: currentTarget.label,
+              },
+            };
+
+            setCapturedSamples(newSamples);
+            audioFeedback.playCelebrationChime();
+
+            const completedCount = Object.keys(newSamples).length;
+            const newProgress = Math.round((completedCount / POSE_TARGETS.length) * 100);
+            setScanProgress(newProgress);
+
+            if (completedCount < POSE_TARGETS.length) {
+              const nextIdx = currentPromptIndex + 1;
+              setCurrentPromptIndex(nextIdx);
+              const nextTarget = POSE_TARGETS[nextIdx];
+              audioFeedback.speakText(nextTarget.instruction);
+            } else {
+              // All 4 poses captured!
+              setIsScanningActive(false);
+              confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+              audioFeedback.speakText(
+                `Hebat sekali! Pemindaian wajah telah selesai. Data wajah ${formData.nickname || 'siswa'} siap didaftarkan.`
+              );
+              // Auto proceed to review after 1.2s
+              setTimeout(() => setStep(3), 1200);
+            }
+          } else if (!isPoseMatched) {
+            // Reset stability counter if pose is lost
+            poseStabilityRef.current = 0;
+          }
+        } else {
+          poseStabilityRef.current = 0;
+          draw3dFaceMesh(null, false);
         }
       } catch (err) {
         console.warn('Scan frame error:', err);
       } finally {
         isProcessingFrame = false;
       }
-    }, 140);
+    }, 120);
 
     return () => clearInterval(interval);
-  }, [step, isScanningActive, isCameraActive, currentPromptIndex, capturedSamples, formData.nickname]);
+  }, [step, isScanningActive, isCameraActive, currentPromptIndex, capturedSamples, formData.nickname, draw3dFaceMesh]);
 
   // Fallback Single Manual Capture
   const handleManualCapture = async (idx: number) => {
@@ -687,6 +791,12 @@ export const RegisterStudentPage: React.FC<RegisterStudentPageProps> = ({ onSucc
                     playsInline
                     muted
                     className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
+                  />
+
+                  {/* 3D Holographic Face ID Mesh Overlay Canvas */}
+                  <canvas
+                    ref={meshCanvasRef}
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none transform scale-x-[-1]"
                   />
 
                   {/* Face Guide Oval */}
