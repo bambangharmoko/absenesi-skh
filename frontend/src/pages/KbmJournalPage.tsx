@@ -12,8 +12,9 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { api, Student, KbmJournalRecord, KbmAttendanceItem, ClassRoomCombination } from '../services/api';
+import { api, Student, KbmJournalRecord, KbmAttendanceItem, ClassRoomCombination, DiscrepancyItem } from '../services/api';
 import { getLocalDateString } from '../services/db';
+import { AttendanceDiscrepancyModal } from '../components/dashboard/AttendanceDiscrepancyModal';
 
 export const KbmJournalPage: React.FC = () => {
   const { currentUser, openProfileModal } = useAuth();
@@ -43,6 +44,8 @@ export const KbmJournalPage: React.FC = () => {
   const [isLoadingStudents, setIsLoadingStudents] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [postSaveDiscrepancies, setPostSaveDiscrepancies] = useState<DiscrepancyItem[]>([]);
+  const [isDiscrepancyModalOpen, setIsDiscrepancyModalOpen] = useState<boolean>(false);
 
   // Journal History State
   const [historyJournals, setHistoryJournals] = useState<KbmJournalRecord[]>([]);
@@ -178,10 +181,21 @@ export const KbmJournalPage: React.FC = () => {
         attendances,
       });
 
-      setSaveSuccessMsg(`Jurnal KBM untuk kelas ${targetClass} (${startTime} - ${endTime}) berhasil disimpan!`);
+      // Audit Diskrepansi Otomatis setelah input KBM (Tugas 4)
+      const discrepancies = api.getAttendanceDiscrepancies(targetClass, todayStr);
+      setPostSaveDiscrepancies(discrepancies);
+
+      if (discrepancies.length > 0) {
+        setSaveSuccessMsg(
+          `Jurnal KBM untuk kelas ${targetClass} (${startTime} - ${endTime}) berhasil disimpan! Namun ditemukan ${discrepancies.length} siswa dengan ketidaksesuaian status antara presensi wajah gerbang vs KBM kelas.`
+        );
+      } else {
+        setSaveSuccessMsg(`Jurnal KBM untuk kelas ${targetClass} (${startTime} - ${endTime}) berhasil disimpan! Seluruh data presensi selaras.`);
+      }
+
       setMeetingTopic('');
       setNotes('');
-      setTimeout(() => setSaveSuccessMsg(null), 5000);
+      setTimeout(() => setSaveSuccessMsg(null), 8000);
       fetchJournals();
     } catch (err: any) {
       alert(err.message || 'Gagal menyimpan jurnal KBM.');
@@ -240,9 +254,29 @@ export const KbmJournalPage: React.FC = () => {
       </div>
 
       {saveSuccessMsg && (
-        <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-3 text-emerald-300 text-xs">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{saveSuccessMsg}</span>
+        <div
+          className={`p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs animate-fadeIn ${
+            postSaveDiscrepancies.length > 0
+              ? 'bg-amber-950/40 border border-amber-500/40 text-amber-200'
+              : 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {postSaveDiscrepancies.length > 0 ? (
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            )}
+            <span className="font-medium">{saveSuccessMsg}</span>
+          </div>
+          {postSaveDiscrepancies.length > 0 && (
+            <button
+              onClick={() => setIsDiscrepancyModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer self-end sm:self-auto shrink-0"
+            >
+              <span>Lihat Detail Audit ({postSaveDiscrepancies.length})</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -700,6 +734,15 @@ export const KbmJournalPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Discrepancy Audit Modal */}
+      <AttendanceDiscrepancyModal
+        isOpen={isDiscrepancyModalOpen}
+        onClose={() => setIsDiscrepancyModalOpen(false)}
+        discrepancies={postSaveDiscrepancies}
+        className={selectedClass || 'Kelas'}
+        date={todayStr}
+      />
     </div>
   );
 };

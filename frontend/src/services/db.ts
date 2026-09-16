@@ -99,6 +99,24 @@ export interface KbmAttendanceItem {
   notes?: string;
 }
 
+export interface DiscrepancyItem {
+  student_id: string;
+  nis: string;
+  student_name: string;
+  student_nickname: string;
+  class_name: string;
+  date: string;
+  face_status: string;
+  face_time_in: string | null;
+  face_time_out: string | null;
+  kbm_status: string;
+  kbm_topic?: string;
+  kbm_time?: string;
+  discrepancy_type: 'BOLOS_KBM' | 'TANPA_SCAN_WAJAH' | 'KONFLIK_STATUS';
+  discrepancy_title: string;
+  discrepancy_description: string;
+}
+
 export interface KbmJournalRecord {
   id: string;
   date: string;
@@ -1609,6 +1627,219 @@ class DatabaseService {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Jurnal Pembelajaran KBM');
 
     const filename = `Laporan_Jurnal_KBM_SKH_${date || 'Semua'}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+  }
+
+  /**
+   * Audit Diskrepansi: Membandingkan Presensi Wajah (Gerbang) vs Presensi Jurnal KBM (Kelas)
+   */
+  getAttendanceDiscrepancies(className: string, date: string): DiscrepancyItem[] {
+    const students = this.getStudents(className);
+    if (!students || students.length === 0) return [];
+
+    const faceRecords = this.getAttendances(date, className);
+    const journals = this.getKbmJournals(className, date);
+
+    const discrepancies: DiscrepancyItem[] = [];
+
+    // Map KBM attendances for today in this class
+    const kbmStudentMap = new Map<string, { status: string; topic: string; time: string; notes?: string }>();
+    journals.forEach(j => {
+      (j.attendances || []).forEach(item => {
+        kbmStudentMap.set(item.student_id, {
+          status: item.status,
+          topic: j.meeting_topic,
+          time: `${j.start_time} - ${j.end_time}`,
+          notes: item.notes,
+        });
+      });
+    });
+
+    students.forEach(student => {
+      const faceRec = faceRecords.find(a => a.student_id === student.id && a.date === date);
+      const hasFaceIn = Boolean(faceRec && faceRec.time_in);
+      const faceStatus = faceRec ? faceRec.status : 'BELUM_HADIR';
+      const kbmData = kbmStudentMap.get(student.id);
+      const kbmStatus = kbmData ? kbmData.status : 'BELUM_ADA_SESI';
+
+      // 1. Siswa tercatat hadir di Gerbang (Face Scan), tapi di KBM ditandai ALPHA / tidak hadir
+      if (hasFaceIn && kbmStatus === 'ALPHA') {
+        discrepancies.push({
+          student_id: student.id,
+          nis: student.nis,
+          student_name: student.full_name,
+          student_nickname: student.nickname,
+          class_name: student.class_name,
+          date,
+          face_status: faceStatus,
+          face_time_in: faceRec?.time_in || null,
+          face_time_out: faceRec?.time_out || null,
+          kbm_status: 'ALPHA',
+          kbm_topic: kbmData?.topic,
+          kbm_time: kbmData?.time,
+          discrepancy_type: 'BOLOS_KBM',
+          discrepancy_title: 'Wajah Hadir di Gerbang, namun Alpha di Kelas KBM',
+          discrepancy_description: `Siswa terdeteksi scan wajah masuk gerbang pukul ${faceRec?.time_in}, namun pada sesi KBM (${kbmData?.topic || 'Kelas'}) ditandai ALPHA. Harap periksa apakah siswa meninggalkan ruang kelas.`,
+        });
+      }
+      // 2. Siswa tercatat HADIR di KBM, namun belum melakukan scan wajah di gerbang
+      else if (!hasFaceIn && kbmStatus === 'HADIR') {
+        discrepancies.push({
+          student_id: student.id,
+          nis: student.nis,
+          student_name: student.full_name,
+          student_nickname: student.nickname,
+          class_name: student.class_name,
+          date,
+          face_status: 'BELUM_HADIR',
+          face_time_in: null,
+          face_time_out: null,
+          kbm_status: 'HADIR',
+          kbm_topic: kbmData?.topic,
+          kbm_time: kbmData?.time,
+          discrepancy_type: 'TANPA_SCAN_WAJAH',
+          discrepancy_title: 'Hadir di Kelas KBM, namun Belum Scan Wajah Gerbang',
+          discrepancy_description: `Siswa dicatat HADIR oleh guru kelas pada sesi KBM (${kbmData?.time || 'KBM'}), tetapi tidak ada log presensi wajah gerbang. Harap lakukan verifikasi manual atau arahkan scan di kiosk gerbang.`,
+        });
+      }
+      // 3. Siswa scan wajah di gerbang, tapi di KBM tercatat IZIN atau SAKIT
+      else if (hasFaceIn && (kbmStatus === 'IZIN' || kbmStatus === 'SAKIT')) {
+        discrepancies.push({
+          student_id: student.id,
+          nis: student.nis,
+          student_name: student.full_name,
+          student_nickname: student.nickname,
+          class_name: student.class_name,
+          date,
+          face_status: faceStatus,
+          face_time_in: faceRec?.time_in || null,
+          face_time_out: faceRec?.time_out || null,
+          kbm_status: kbmStatus,
+          kbm_topic: kbmData?.topic,
+          kbm_time: kbmData?.time,
+          discrepancy_type: 'KONFLIK_STATUS',
+          discrepancy_title: `Konflik Status: Scan Wajah Masuk vs KBM ${kbmStatus}`,
+          discrepancy_description: `Siswa scan wajah gerbang pukul ${faceRec?.time_in}, namun tercatat ${kbmStatus} di KBM. Perlu dipastikan apakah siswa izin pulang setelah sampai atau salah input.`,
+        });
+      }
+    });
+
+    return discrepancies;
+  }
+
+  /**
+   * Export Laporan Excel Khusus Wali Kelas dengan Komparasi Dual-Data (Wajah vs KBM)
+   */
+  exportTeacherClassAttendanceExcel(className: string, dateRange: { startDate: string; endDate: string; label: string }): void {
+    const students = this.getStudents(className);
+    const allAttendances = this.getAttendances(undefined, className);
+    const allJournals = this.getKbmJournals(className);
+
+    const start = dateRange.startDate;
+    const end = dateRange.endDate;
+
+    const inRangeAttendances = allAttendances.filter(a => a.date >= start && a.date <= end);
+    const inRangeJournals = allJournals.filter(j => j.date >= start && j.date <= end);
+
+    const dateSet = new Set<string>();
+    inRangeAttendances.forEach(a => dateSet.add(a.date));
+    inRangeJournals.forEach(j => dateSet.add(j.date));
+    if (dateSet.size === 0) {
+      dateSet.add(start);
+    }
+    const sortedDates = Array.from(dateSet).sort();
+
+    const mainRows: any[] = [];
+    const discrepancyRows: any[] = [];
+    let no = 1;
+    let discNo = 1;
+
+    sortedDates.forEach(date => {
+      const dayAttendances = inRangeAttendances.filter(a => a.date === date);
+      const dayJournals = inRangeJournals.filter(j => j.date === date);
+
+      const kbmStudentMap = new Map<string, { status: string; topic: string; time: string; notes?: string }>();
+      dayJournals.forEach(j => {
+        (j.attendances || []).forEach(item => {
+          kbmStudentMap.set(item.student_id, {
+            status: item.status,
+            topic: j.meeting_topic,
+            time: `${j.start_time} - ${j.end_time}`,
+            notes: item.notes,
+          });
+        });
+      });
+
+      students.forEach(student => {
+        const faceRec = dayAttendances.find(a => a.student_id === student.id);
+        const hasFaceIn = Boolean(faceRec && faceRec.time_in);
+        const faceStatus = faceRec ? faceRec.status : 'BELUM HADIR';
+        const kbmData = kbmStudentMap.get(student.id);
+        const kbmStatus = kbmData ? kbmData.status : (dayJournals.length > 0 ? 'TIDAK TERCATAT' : 'BELUM ADA KBM');
+
+        let kesesuaian = 'SESUAI';
+        let detailDiskrepansi = 'Data kehadiran selaras';
+
+        if (hasFaceIn && kbmStatus === 'ALPHA') {
+          kesesuaian = 'DISKREPANSI (BOLOS KBM)';
+          detailDiskrepansi = `Scan gerbang jam ${faceRec?.time_in}, namun Alpha di KBM (${kbmData?.topic || 'Kelas'})`;
+        } else if (!hasFaceIn && kbmStatus === 'HADIR') {
+          kesesuaian = 'DISKREPANSI (TANPA SCAN WAJAH)';
+          detailDiskrepansi = `Hadir di KBM kelas, namun tidak ada rekaman scan wajah di gerbang`;
+        } else if (hasFaceIn && (kbmStatus === 'IZIN' || kbmStatus === 'SAKIT')) {
+          kesesuaian = `DISKREPANSI (KONFLIK ${kbmStatus})`;
+          detailDiskrepansi = `Scan gerbang jam ${faceRec?.time_in}, namun di KBM tercatat ${kbmStatus}`;
+        }
+
+        const row = {
+          No: no++,
+          'NIS Siswa': student.nis,
+          'Nama Siswa': student.full_name,
+          'Nama Panggilan': student.nickname,
+          Kelas: student.class_name,
+          Tanggal: date,
+          'Jam Masuk (Gerbang)': faceRec?.time_in || '-',
+          'Jam Pulang (Gerbang)': faceRec?.time_out || '-',
+          'Status Presensi Wajah': faceStatus,
+          'Status Presensi KBM': kbmStatus,
+          'Topik / Sesi KBM': kbmData?.topic ? `${kbmData.topic} (${kbmData.time})` : '-',
+          'Status Kesesuaian': kesesuaian,
+          'Keterangan Audit': detailDiskrepansi,
+        };
+
+        mainRows.push(row);
+
+        if (kesesuaian.startsWith('DISKREPANSI')) {
+          discrepancyRows.push({
+            No: discNo++,
+            'NIS Siswa': student.nis,
+            'Nama Siswa': student.full_name,
+            Kelas: student.class_name,
+            Tanggal: date,
+            'Jam Masuk Gerbang': faceRec?.time_in || '-',
+            'Status Wajah': faceStatus,
+            'Status KBM': kbmStatus,
+            'Tipe Diskrepansi': kesesuaian,
+            'Detail Masalah': detailDiskrepansi,
+          });
+        }
+      });
+    });
+
+    const workbook = XLSX.utils.book_new();
+
+    // Sheet 1: Rekap Komparasi Dual-Data
+    const wsMain = XLSX.utils.json_to_sheet(mainRows);
+    XLSX.utils.book_append_sheet(workbook, wsMain, 'Rekap Dual-Presensi');
+
+    // Sheet 2: Khusus Temuan Diskrepansi
+    if (discrepancyRows.length > 0) {
+      const wsDisc = XLSX.utils.json_to_sheet(discrepancyRows);
+      XLSX.utils.book_append_sheet(workbook, wsDisc, 'Temuan Diskrepansi');
+    }
+
+    const cleanClassName = className.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `Rekap_Presensi_WaliKelas_${cleanClassName}_${dateRange.label || start}.xlsx`;
     XLSX.writeFile(workbook, filename);
   }
 

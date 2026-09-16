@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar, AppPage } from './components/layout/Navbar';
 import { KioskPage } from './pages/KioskPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -13,16 +13,62 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
 import { ProfileModal } from './components/auth/ProfileModal';
+import { UserRole } from './services/api';
+
+/**
+ * TUGAS 1: Aturan Default Route Berdasarkan Role
+ * - Role Guest (unauthenticated / publik) dan Admin: Default landing page -> "Kiosk Absensi" (kiosk)
+ * - Role Guru dan Kepala Sekolah: Default landing page -> "Dashboard" (dashboard)
+ */
+export const getDefaultLandingPage = (role: UserRole | 'GUEST', isAuthenticated: boolean): AppPage => {
+  if (!isAuthenticated || role === 'GUEST' || role === 'ADMIN') {
+    return 'kiosk';
+  }
+  if (role === 'GURU' || role === 'KEPALA_SEKOLAH') {
+    return 'dashboard';
+  }
+  return 'kiosk';
+};
 
 const AppContent: React.FC = () => {
   const { currentUser, isAuthenticated, role, openLoginModal } = useAuth();
-  const [currentPage, setCurrentPage] = useState<AppPage>('kiosk');
+
+  // Initial landing page based on role (Tugas 1)
+  const [currentPage, setCurrentPage] = useState<AppPage>(() =>
+    getDefaultLandingPage(role, isAuthenticated)
+  );
+
+  const prevAuthRef = useRef<{ isAuthenticated: boolean; role: string; userId?: string }>({
+    isAuthenticated,
+    role,
+    userId: currentUser?.id,
+  });
+
+  // Automatic redirect upon login, logout, or role switch
+  useEffect(() => {
+    const prev = prevAuthRef.current;
+    const authChanged = prev.isAuthenticated !== isAuthenticated;
+    const roleChanged = prev.role !== role;
+    const userChanged = prev.userId !== currentUser?.id;
+
+    if (authChanged || roleChanged || userChanged) {
+      prevAuthRef.current = {
+        isAuthenticated,
+        role,
+        userId: currentUser?.id,
+      };
+
+      // Automatically redirect to role's default landing page (Tugas 1)
+      const targetDefault = getDefaultLandingPage(role, isAuthenticated);
+      setCurrentPage(targetDefault);
+    }
+  }, [isAuthenticated, role, currentUser]);
 
   // Automatic RBAC Guard: If user logs out or role changes while on a forbidden page
   useEffect(() => {
     if (!isAuthenticated) {
       if (currentPage !== 'kiosk' && currentPage !== 'dashboard') {
-        setCurrentPage('dashboard');
+        setCurrentPage('kiosk');
       }
     } else if (role === 'GURU') {
       if (
@@ -42,7 +88,7 @@ const AppContent: React.FC = () => {
         currentPage === 'manage-classes' ||
         currentPage === 'operational-hours'
       ) {
-        setCurrentPage('dashboard');
+        setCurrentPage('kiosk');
       }
     }
   }, [isAuthenticated, role, currentPage]);
@@ -52,7 +98,7 @@ const AppContent: React.FC = () => {
     if (!isAuthenticated) {
       if (page !== 'kiosk' && page !== 'dashboard') {
         openLoginModal();
-        setCurrentPage('dashboard');
+        setCurrentPage('kiosk');
         return;
       }
     }
@@ -77,7 +123,7 @@ const AppContent: React.FC = () => {
       (page === 'jurnal-kbm' || page === 'users' || page === 'manage-classes' || page === 'operational-hours')
     ) {
       alert('Halaman ini khusus untuk Role Guru atau Kepala Sekolah.');
-      setCurrentPage('dashboard');
+      setCurrentPage('kiosk');
       return;
     }
 

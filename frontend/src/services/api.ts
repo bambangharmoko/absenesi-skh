@@ -10,6 +10,7 @@ import {
   ClassGrade,
   RoomItem,
   ClassRoomCombination,
+  DiscrepancyItem,
 } from './db';
 import { faceApi } from './faceApi';
 
@@ -22,6 +23,7 @@ export type {
   ClassGrade,
   RoomItem,
   ClassRoomCombination,
+  DiscrepancyItem,
 };
 
 export interface Student {
@@ -596,6 +598,15 @@ export const api = {
 
   async updateClassOperationalHours(classRoomIds: string[], timeIn: string, timeOut: string): Promise<void> {
     await db.updateClassOperationalHours(classRoomIds, timeIn, timeOut);
+  },
+
+  // Audit Diskrepansi & Ekspor Laporan Guru
+  getAttendanceDiscrepancies(className: string, date: string): DiscrepancyItem[] {
+    return db.getAttendanceDiscrepancies(className, date);
+  },
+
+  exportTeacherClassAttendanceExcel(className: string, dateRange: { startDate: string; endDate: string; label: string }): void {
+    db.exportTeacherClassAttendanceExcel(className, dateRange);
   },
 };
 

@@ -177,14 +177,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     );
   };
 
-  return (
+    const defaultLandingPage: AppPage = !isAuthenticated || role === 'ADMIN' ? 'kiosk' : 'dashboard';
+
+    return (
     <>
       <header className="sticky top-0 z-40 w-full bg-[#0d1322]/95 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* School Logo & System Title */}
             <div
-              onClick={() => onNavigate('dashboard')}
+              onClick={() => onNavigate(defaultLandingPage)}
               className="flex items-center gap-3 cursor-pointer group select-none"
             >
               <div className="w-9 h-9 rounded-lg bg-blue-600/10 border border-blue-500/25 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition">
